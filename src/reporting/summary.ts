@@ -11,6 +11,10 @@ export function formatSummary(summary: RunSummary): string {
     `Errors occurred: ${summary.errorsOccurred}`,
   ];
 
+  if (summary.finalStatus === 'manual_intervention_required' && summary.levelUpDetected) {
+    lines.push('Reason: The brute leveled up and requires a manual upgrade choice before continuing.');
+  }
+
   if (summary.artifacts?.screenshotPath) {
     lines.push(`Screenshot: ${summary.artifacts.screenshotPath}`);
   }
