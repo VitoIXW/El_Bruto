@@ -1,0 +1,71 @@
+import type { Locator, Page } from 'playwright';
+
+import { selectors, buildCellHrefPattern, normalizeText } from './selectors';
+
+export async function extractBruteName(page: Page): Promise<string | undefined> {
+  const heading = page.locator(selectors.cell.bruteNameHeading).first();
+  if (await heading.count()) {
+    const text = normalizeText(await heading.textContent());
+    if (text) {
+      return text.replace(/^Cell of\s+/i, '').trim();
+    }
+  }
+
+  const match = page.url().match(/brute\.eternaltwin\.org\/([^/]+)\/(cell|arena|fight|versus)/i);
+  return match?.[1];
+}
+
+export async function clickArena(page: Page): Promise<void> {
+  await page.locator(selectors.cell.arenaLink).first().click();
+}
+
+export async function chooseFirstOpponent(page: Page): Promise<void> {
+  const explicitFightControls = page.locator(selectors.arena.opponentLinks);
+  const explicitCount = await explicitFightControls.count();
+  if (explicitCount > 0) {
+    await explicitFightControls.first().click();
+    return;
+  }
+
+  const opponentCards = page.locator(selectors.arena.opponentCards);
+  const cardCount = await opponentCards.count();
+  if (cardCount === 0) {
+    throw new Error('No arena opponent controls or rival cards were found.');
+  }
+
+  await opponentCards.first().click();
+}
+
+export async function startFight(page: Page): Promise<void> {
+  const startControl = page.locator(selectors.preFight.startFightLink).first();
+  await startControl.click();
+}
+
+export async function clickReturnToCurrentCell(page: Page, bruteName: string): Promise<void> {
+  const hrefPattern = buildCellHrefPattern(bruteName);
+  const links = page.locator(selectors.fight.returnToCellLinks);
+  const count = await links.count();
+
+  for (let index = 0; index < count; index += 1) {
+    const link = links.nth(index);
+    const href = await link.getAttribute('href');
+    if (href?.includes(hrefPattern)) {
+      await link.click();
+      return;
+    }
+  }
+
+  throw new Error(`Unable to find return link for brute ${bruteName}.`);
+}
+
+export async function waitForUrlSuffix(page: Page, suffix: string, timeoutMs: number): Promise<void> {
+  await page.waitForURL((url) => url.pathname.endsWith(suffix), { timeout: timeoutMs });
+}
+
+export async function hasVisible(locator: Locator): Promise<boolean> {
+  try {
+    return await locator.first().isVisible();
+  } catch {
+    return false;
+  }
+}
