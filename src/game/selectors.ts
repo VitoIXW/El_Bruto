@@ -32,8 +32,8 @@ export const selectors = {
     fightContainer: 'main, body',
   },
   levelUp: {
-    levelUpHeading: 'text=/level up/i',
-    levelUpChoiceText: 'text=/choose|skill|weapon|pet/i',
+    levelUpHeading: 'text=/level up|sube de nivel/i',
+    levelUpChoiceText: 'text=/choose|skill|weapon|pet|sacrificar|reiniciar|subir de rango/i',
   },
 };
 
