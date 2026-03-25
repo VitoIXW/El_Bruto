@@ -233,3 +233,45 @@ test(
   }
   },
 );
+
+test('continueToConfiguredBrute navigates directly to the chosen brute cell without revisiting bootstrap home', { concurrency: false }, async () => {
+  const originalDetectState = detector.detectState;
+  const page = {
+    visitedUrls: [] as string[],
+    waitForTimeoutCalls: [] as number[],
+    async goto(url: string) {
+      this.visitedUrls.push(url);
+    },
+    async waitForTimeout(timeoutMs: number) {
+      this.waitForTimeoutCalls.push(timeoutMs);
+    },
+  };
+  const states: StateDetectionDetails[] = [
+    { state: 'authenticated_home', url: 'https://brute.eternaltwin.org/', notes: [] },
+    {
+      state: 'cell_ready',
+      url: 'https://brute.eternaltwin.org/TargetBrute/cell',
+      bruteNameFromPage: 'TargetBrute',
+      notes: [],
+    },
+  ];
+
+  detector.detectState = async () => {
+    const nextState = states.shift();
+    if (!nextState) {
+      throw new Error('No more states configured for detectState.');
+    }
+    return nextState;
+  };
+
+  try {
+    const result = await startup.continueToConfiguredBrute(page as never, createConfig(), createLogger());
+
+    assert.equal(result.state, 'cell_ready');
+    assert.equal(result.bruteNameFromPage, 'TargetBrute');
+    assert.deepEqual(page.visitedUrls, ['https://brute.eternaltwin.org/TargetBrute/cell']);
+    assert.deepEqual(page.waitForTimeoutCalls, [1000]);
+  } finally {
+    detector.detectState = originalDetectState;
+  }
+});

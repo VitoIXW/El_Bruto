@@ -141,7 +141,10 @@ test('listHallRosterBrutes navigates to /hall and waits for hall roster content'
             const hallContainer = hallContainers[containerIndex];
             return {
               locator(subSelector: string) {
-                assert.equal(subSelector, selectors.hall.rosterEntries);
+                assert.ok([
+                  selectors.hall.rosterEntries,
+                  selectors.hall.descendantRosterEntries,
+                ].includes(subSelector));
                 return {
                   first() {
                     operations.push(`hallEntries.first:${containerIndex}`);
@@ -158,6 +161,9 @@ test('listHallRosterBrutes navigates to /hall and waits for hall roster content'
                     return {
                       async getAttribute(name: string) {
                         return entry.attributes[name as 'aria-label' | 'title'];
+                      },
+                      async boundingBox() {
+                        return (entry as { boundingBoxData?: object }).boundingBoxData ?? null;
                       },
                       async innerText() {
                         return entry.text;
@@ -265,7 +271,10 @@ test('listHallRosterBrutes logs hall discovery steps and finds roster candidates
           const hallContainer = hallContainers[containerIndex];
           return {
             locator(subSelector: string) {
-              assert.equal(subSelector, selectors.hall.rosterEntries);
+              assert.ok([
+                selectors.hall.rosterEntries,
+                selectors.hall.descendantRosterEntries,
+              ].includes(subSelector));
               return {
                 first() {
                   return this;
@@ -279,6 +288,9 @@ test('listHallRosterBrutes logs hall discovery steps and finds roster candidates
                   return {
                     async getAttribute(name: string) {
                       return entry.attributes[name as 'aria-label' | 'title'];
+                    },
+                    async boundingBox() {
+                      return (entry as { boundingBoxData?: object }).boundingBoxData ?? null;
                     },
                     async innerText() {
                       return entry.text;
@@ -346,8 +358,332 @@ test('listHallRosterBrutes logs hall discovery steps and finds roster candidates
   assert.deepEqual(result, ['ExampleBrute', 'TargetBrute']);
   assert.match(logs[0] ?? '', /\[hall\] Opening hall roster page https:\/\/brute\.eternaltwin\.org\/hall/);
   assert.match(logs[1] ?? '', /\[hall\] Found 2 hall roster container candidate\(s\)\./);
-  assert.match(logs[2] ?? '', /\[hall\] Selected hall roster candidate #1 with 2 entries, 2 structurally valid, 2 extracted names\./);
-  assert.match(logs[3] ?? '', /\[hall\] Resolved 2 hall brute name\(s\): ExampleBrute, TargetBrute/);
+  assert.match(logs[2] ?? '', /\[hall\] Selected hall roster candidate #1 using direct entry discovery with 2 entries, 2 structurally valid, 2 extracted names\./);
+  assert.match(logs[3] ?? '', /\[hall\] Accepted hall entries \(2\/2\): #0:ExampleBrute \|\| #1:TargetBrute/);
+  assert.match(logs[4] ?? '', /\[hall\] Resolved 2 hall brute name\(s\): ExampleBrute, TargetBrute/);
+});
+
+test('listHallRosterBrutes falls back to descendant hall entries to return the full roster and logs rejected entries', async () => {
+  const logs: string[] = [];
+  const hallContainers = [
+    {
+      directEntries: [
+        {
+          text: 'Resumen del salon',
+          attributes: { 'aria-label': null, title: null },
+          nameNodes: ['Resumen del salon'],
+          statIcons: 0,
+          fights: 0,
+        },
+      ],
+      descendantEntries: [
+        {
+          text: 'Nivel 21 ExampleBrute',
+          attributes: { 'aria-label': 'Te quedan 0 combates para el día de hoy.', title: null },
+          nameNodes: ['ExampleBrute'],
+          statIcons: 3,
+          fights: 1,
+        },
+        {
+          text: 'Nivel 17 TargetBrute',
+          attributes: { 'aria-label': 'Te quedan 1 combates para el día de hoy.', title: null },
+          nameNodes: ['TargetBrute'],
+          statIcons: 3,
+          fights: 1,
+        },
+        {
+          text: 'Nivel 12 OpponentBrute',
+          attributes: { 'aria-label': 'Te quedan 2 combates para el día de hoy.', title: null },
+          nameNodes: ['OpponentBrute'],
+          statIcons: 2,
+          fights: 1,
+        },
+        {
+          text: 'Historial de eventos',
+          attributes: { 'aria-label': null, title: null },
+          nameNodes: ['Historial de eventos'],
+          statIcons: 0,
+          fights: 0,
+        },
+      ],
+      descendantNoiseEntries: [
+        {
+          text: 'ExampleBrute',
+          attributes: { 'aria-label': null, title: null },
+          nameNodes: ['ExampleBrute'],
+          statIcons: 0,
+          fights: 0,
+        },
+        {
+          text: 'strength agility speed',
+          attributes: { 'aria-label': null, title: null },
+          nameNodes: [],
+          statIcons: 3,
+          fights: 0,
+        },
+      ],
+    },
+  ];
+
+  const page = {
+    async goto() {},
+    locator(selector: string) {
+      assert.equal(selector, selectors.hall.rosterContainer);
+      return {
+        async count() {
+          return hallContainers.length;
+        },
+        nth(containerIndex: number) {
+          const hallContainer = hallContainers[containerIndex];
+          return {
+            locator(subSelector: string) {
+              const entries = subSelector === selectors.hall.rosterEntries
+                ? hallContainer.directEntries
+                : subSelector === selectors.hall.descendantRosterEntries
+                  ? hallContainer.descendantEntries
+                  : undefined;
+              if (!entries) {
+                throw new Error(`Unexpected container selector: ${subSelector}`);
+              }
+              return {
+                first() {
+                  return this;
+                },
+                async waitFor() {},
+                async count() {
+                  return entries.length;
+                },
+                nth(index: number) {
+                  const entry = entries[index];
+                  return {
+                    async getAttribute(name: string) {
+                      return entry.attributes[name as 'aria-label' | 'title'];
+                    },
+                    async boundingBox() {
+                      return (entry as { boundingBoxData?: object }).boundingBoxData ?? null;
+                    },
+                    async innerText() {
+                      return entry.text;
+                    },
+                    locator(innerSelector: string) {
+                      if (innerSelector === selectors.hall.entryName) {
+                        return {
+                          async count() {
+                            return entry.nameNodes.length;
+                          },
+                          nth(candidateIndex: number) {
+                            return {
+                              async innerText() {
+                                return entry.nameNodes[candidateIndex];
+                              },
+                            };
+                          },
+                        };
+                      }
+
+                      if (innerSelector === selectors.hall.entryStatIcons) {
+                        return {
+                          async count() {
+                            return entry.statIcons;
+                          },
+                        };
+                      }
+
+                      if (innerSelector === selectors.hall.entryFightAvailability) {
+                        return {
+                          async count() {
+                            return entry.fights;
+                          },
+                        };
+                      }
+
+                      throw new Error(`Unexpected entry selector: ${innerSelector}`);
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  const logger = {
+    info(message: string) {
+      logs.push(message);
+    },
+    warn() {},
+    error() {},
+    debug() {},
+    logFilePath: '/tmp/example.log',
+  };
+
+  const result = await listHallRosterBrutes(page as never, 'https://brute.eternaltwin.org/', logger);
+
+  assert.deepEqual(result, ['ExampleBrute', 'TargetBrute', 'OpponentBrute']);
+  assert.match(logs[2] ?? '', /using descendant entry discovery with 4 entries, 3 structurally valid, 3 extracted names/);
+  assert.match(logs[3] ?? '', /Accepted hall entries \(3\/4\): #0:ExampleBrute \|\| #1:TargetBrute \|\| #2:OpponentBrute/);
+  assert.match(logs[4] ?? '', /Rejected hall entries \(1\/4\): #3:(blocked-action|missing-structural-evidence):Historial de eventos/);
+  assert.match(logs[5] ?? '', /Resolved 3 hall brute name\(s\): ExampleBrute, TargetBrute, OpponentBrute/);
+});
+
+test('listHallRosterBrutes deduplicates overlapping descendant matches so one brute card counts once', async () => {
+  const logs: string[] = [];
+  const hallContainers = [
+    {
+      directEntries: [
+        {
+          text: 'Panel',
+          attributes: { 'aria-label': null, title: null },
+          nameNodes: ['Panel'],
+          statIcons: 0,
+          fights: 0,
+        },
+      ],
+      descendantEntries: [
+        {
+          text: 'Nivel 22 ExampleBrute',
+          attributes: { 'aria-label': 'Te quedan 0 combates para el día de hoy.', title: null },
+          nameNodes: ['ExampleBrute'],
+          statIcons: 3,
+          fights: 1,
+          boundingBoxData: { x: 0, y: 0, width: 200, height: 120 },
+        },
+        {
+          text: 'Nivel 22 ExampleBrute',
+          attributes: { 'aria-label': 'Te quedan 0 combates para el día de hoy.', title: null },
+          nameNodes: ['ExampleBrute'],
+          statIcons: 3,
+          fights: 1,
+          boundingBoxData: { x: 16, y: 12, width: 140, height: 84 },
+        },
+        {
+          text: 'Nivel 18 TargetBrute',
+          attributes: { 'aria-label': 'Te quedan 1 combates para el día de hoy.', title: null },
+          nameNodes: ['TargetBrute'],
+          statIcons: 3,
+          fights: 1,
+          boundingBoxData: { x: 0, y: 140, width: 200, height: 120 },
+        },
+        {
+          text: 'Nivel 18 TargetBrute',
+          attributes: { 'aria-label': 'Te quedan 1 combates para el día de hoy.', title: null },
+          nameNodes: ['TargetBrute'],
+          statIcons: 3,
+          fights: 1,
+          boundingBoxData: { x: 20, y: 154, width: 132, height: 80 },
+        },
+      ],
+    },
+  ];
+
+  const page = {
+    async goto() {},
+    locator(selector: string) {
+      assert.equal(selector, selectors.hall.rosterContainer);
+      return {
+        async count() {
+          return hallContainers.length;
+        },
+        nth(containerIndex: number) {
+          const hallContainer = hallContainers[containerIndex];
+          return {
+            locator(subSelector: string) {
+              if (subSelector === '.MuiBox-root, [class*="box" i]') {
+                throw new Error('Broad descendant MuiBox selector should not be used for hall roster discovery.');
+              }
+
+              const entries = subSelector === selectors.hall.rosterEntries
+                ? hallContainer.directEntries
+                : subSelector === selectors.hall.descendantRosterEntries
+                  ? hallContainer.descendantEntries
+                  : undefined;
+
+              if (!entries) {
+                throw new Error(`Unexpected container selector: ${subSelector}`);
+              }
+
+              return {
+                first() {
+                  return this;
+                },
+                async waitFor() {},
+                async count() {
+                  return entries.length;
+                },
+                nth(index: number) {
+                  const entry = entries[index];
+                  return {
+                    async getAttribute(name: string) {
+                      return entry.attributes[name as 'aria-label' | 'title'];
+                    },
+                    async boundingBox() {
+                      return (entry as { boundingBoxData?: object }).boundingBoxData ?? null;
+                    },
+                    async innerText() {
+                      return entry.text;
+                    },
+                    locator(innerSelector: string) {
+                      if (innerSelector === selectors.hall.entryName) {
+                        return {
+                          async count() {
+                            return entry.nameNodes.length;
+                          },
+                          nth(candidateIndex: number) {
+                            return {
+                              async innerText() {
+                                return entry.nameNodes[candidateIndex];
+                              },
+                            };
+                          },
+                        };
+                      }
+
+                      if (innerSelector === selectors.hall.entryStatIcons) {
+                        return {
+                          async count() {
+                            return entry.statIcons;
+                          },
+                        };
+                      }
+
+                      if (innerSelector === selectors.hall.entryFightAvailability) {
+                        return {
+                          async count() {
+                            return entry.fights;
+                          },
+                        };
+                      }
+
+                      throw new Error(`Unexpected entry selector: ${innerSelector}`);
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  const logger = {
+    info(message: string) {
+      logs.push(message);
+    },
+    warn() {},
+    error() {},
+    debug() {},
+    logFilePath: '/tmp/example.log',
+  };
+
+  const result = await listHallRosterBrutes(page as never, 'https://brute.eternaltwin.org/', logger);
+
+  assert.deepEqual(result, ['ExampleBrute', 'TargetBrute']);
+  assert.match(logs[2] ?? '', /using descendant entry discovery with 2 entries, 2 structurally valid, 2 extracted names/);
+  assert.doesNotMatch(logs[2] ?? '', /3 entries|4 entries|5 entries|6 entries/);
+  assert.match(logs[3] ?? '', /Accepted hall entries \(2\/2\): #0:ExampleBrute \|\| #1:TargetBrute/);
 });
 
 test('listHallRosterBrutes reports when container candidates exist but none meet the repeated-entry threshold', async () => {
@@ -388,7 +724,10 @@ test('listHallRosterBrutes reports when container candidates exist but none meet
             const hallContainer = hallContainers[containerIndex];
             return {
               locator(subSelector: string) {
-                assert.equal(subSelector, selectors.hall.rosterEntries);
+                assert.ok([
+                  selectors.hall.rosterEntries,
+                  selectors.hall.descendantRosterEntries,
+                ].includes(subSelector));
                 return {
                   first() {
                     return this;
@@ -402,6 +741,9 @@ test('listHallRosterBrutes reports when container candidates exist but none meet
                     return {
                       async getAttribute(name: string) {
                         return entry.attributes[name as 'aria-label' | 'title'];
+                      },
+                      async boundingBox() {
+                        return (entry as { boundingBoxData?: object }).boundingBoxData ?? null;
                       },
                       async innerText() {
                         return entry.text;
@@ -500,7 +842,10 @@ test('listHallRosterBrutes rejects repeated non-roster hall controls and surface
             const hallContainer = hallContainers[containerIndex];
             return {
               locator(subSelector: string) {
-                assert.equal(subSelector, selectors.hall.rosterEntries);
+                assert.ok([
+                  selectors.hall.rosterEntries,
+                  selectors.hall.descendantRosterEntries,
+                ].includes(subSelector));
                 return {
                   first() {
                     return this;
@@ -514,6 +859,9 @@ test('listHallRosterBrutes rejects repeated non-roster hall controls and surface
                     return {
                       async getAttribute(name: string) {
                         return entry.attributes[name as 'aria-label' | 'title'];
+                      },
+                      async boundingBox() {
+                        return (entry as { boundingBoxData?: object }).boundingBoxData ?? null;
                       },
                       async innerText() {
                         return entry.text;
@@ -583,7 +931,10 @@ test('listHallRosterBrutes reports repeated-entry threshold failure when candida
           nth() {
             return {
               locator(subSelector: string) {
-                assert.equal(subSelector, selectors.hall.rosterEntries);
+                assert.ok([
+                  selectors.hall.rosterEntries,
+                  selectors.hall.descendantRosterEntries,
+                ].includes(subSelector));
                 return {
                   async count() {
                     return 0;
@@ -639,7 +990,10 @@ test('listHallRosterBrutes reports when repeated entries are structurally valid 
             const hallContainer = hallContainers[containerIndex];
             return {
               locator(subSelector: string) {
-                assert.equal(subSelector, selectors.hall.rosterEntries);
+                assert.ok([
+                  selectors.hall.rosterEntries,
+                  selectors.hall.descendantRosterEntries,
+                ].includes(subSelector));
                 return {
                   first() {
                     return this;
@@ -653,6 +1007,9 @@ test('listHallRosterBrutes reports when repeated entries are structurally valid 
                     return {
                       async getAttribute(name: string) {
                         return entry.attributes[name as 'aria-label' | 'title'];
+                      },
+                      async boundingBox() {
+                        return (entry as { boundingBoxData?: object }).boundingBoxData ?? null;
                       },
                       async innerText() {
                         return entry.text;
@@ -715,6 +1072,8 @@ test('hall roster selector targets intentional brute-entry structures', () => {
   assert.match(selectors.hall.rosterContainer, /#root/);
   assert.match(selectors.hall.rosterContainer, /\.MuiPaper-root/);
   assert.match(selectors.hall.rosterEntries, /:scope > \.MuiBox-root/);
+  assert.match(selectors.hall.descendantRosterEntries, /:has\(/);
+  assert.match(selectors.hall.descendantRosterEntries, /aria-label\*="combates"/);
   assert.match(selectors.hall.entryName, /\.MuiTypography-root/);
   assert.match(selectors.hall.entryFightAvailability, /aria-label\*="combates"/);
 });

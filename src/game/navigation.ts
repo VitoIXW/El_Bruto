@@ -66,16 +66,23 @@ interface HallCandidateInspection {
   bruteName?: string;
   summary: string;
   hasStructuralEvidence: boolean;
+  reason: string;
 }
 
 interface HallContainerInspection {
   index: number;
+  strategy: 'direct' | 'descendant';
   entryCount: number;
   repeatedEntryCount: number;
   acceptedEntryCount: number;
   extractedNameCount: number;
   rejectedSummaries: string[];
   rosterEntries: Locator;
+}
+
+interface NormalizedHallEntries {
+  count: number;
+  nth(index: number): Locator;
 }
 
 function logHallDiscovery(logger: Logger | undefined, message: string): void {
@@ -266,7 +273,7 @@ async function hasHallStructuralEvidence(entry: Locator): Promise<boolean> {
   const statIconCount = await entry.locator(selectors.hall.entryStatIcons).count().catch(() => 0);
   const fightAvailabilityCount = await entry.locator(selectors.hall.entryFightAvailability).count().catch(() => 0);
 
-  return hasLevelLine && (statIconCount >= 2 || fightAvailabilityCount > 0);
+  return (hasLevelLine || statIconCount >= 2) && (statIconCount >= 2 || fightAvailabilityCount > 0);
 }
 
 async function inspectHallCandidate(entry: Locator): Promise<HallCandidateInspection> {
@@ -282,6 +289,7 @@ async function inspectHallCandidate(entry: Locator): Promise<HallCandidateInspec
       accepted: false,
       summary,
       hasStructuralEvidence,
+      reason: hasBlockedAction ? 'blocked-action' : 'missing-structural-evidence',
     };
   }
 
@@ -290,6 +298,7 @@ async function inspectHallCandidate(entry: Locator): Promise<HallCandidateInspec
       accepted: false,
       summary,
       hasStructuralEvidence,
+      reason: 'missing-brute-name',
     };
   }
 
@@ -298,22 +307,25 @@ async function inspectHallCandidate(entry: Locator): Promise<HallCandidateInspec
     bruteName,
     summary,
     hasStructuralEvidence,
+    reason: 'accepted',
   };
 }
 
-async function inspectHallContainer(
-  container: Locator,
+async function inspectHallContainerEntries(
+  rosterEntries: Locator,
   index: number,
+  strategy: 'direct' | 'descendant',
 ): Promise<HallContainerInspection> {
-  const rosterEntries = container.locator(selectors.hall.rosterEntries);
-  const entryCount = await rosterEntries.count().catch(() => 0);
+  const originalEntryCount = await rosterEntries.count().catch(() => 0);
+  const normalizedEntries = await normalizeHallRosterEntries(rosterEntries, strategy);
+  const entryCount = normalizedEntries.count;
   const repeatedEntryCount = entryCount >= HALL_REPEATED_ENTRY_THRESHOLD ? entryCount : 0;
   const rejectedSummaries: string[] = [];
   let acceptedEntryCount = 0;
   let extractedNameCount = 0;
 
   for (let entryIndex = 0; entryIndex < entryCount; entryIndex += 1) {
-    const inspection = await inspectHallCandidate(rosterEntries.nth(entryIndex));
+    const inspection = await inspectHallCandidate(normalizedEntries.nth(entryIndex));
     if (inspection.hasStructuralEvidence) {
       acceptedEntryCount += 1;
     }
@@ -327,13 +339,115 @@ async function inspectHallContainer(
 
   return {
     index,
+    strategy,
     entryCount,
     repeatedEntryCount,
     acceptedEntryCount,
     extractedNameCount,
     rejectedSummaries,
-    rosterEntries,
+    rosterEntries: {
+      first() {
+        if (entryCount === originalEntryCount && typeof rosterEntries.first === 'function') {
+          return rosterEntries.first();
+        }
+        const firstEntry = normalizedEntries.nth(0);
+        return {
+          waitFor(options: { state: string; timeout: number }) {
+            if (typeof firstEntry.waitFor === 'function') {
+              return firstEntry.waitFor(options as Parameters<Locator['waitFor']>[0]);
+            }
+            return Promise.resolve();
+          },
+        } as Locator;
+      },
+      nth(entryIndex: number) {
+        return normalizedEntries.nth(entryIndex);
+      },
+    } as Locator,
   };
+}
+
+async function normalizeHallRosterEntries(
+  rosterEntries: Locator,
+  strategy: 'direct' | 'descendant',
+): Promise<NormalizedHallEntries> {
+  const entryCount = await rosterEntries.count().catch(() => 0);
+  if (strategy !== 'descendant' || entryCount < 2) {
+    return {
+      count: entryCount,
+      nth(index: number) {
+        return rosterEntries.nth(index);
+      },
+    };
+  }
+
+  const candidates = await Promise.all(
+    Array.from({ length: entryCount }, async (_value, index) => {
+      const entry = rosterEntries.nth(index);
+      const box = typeof entry.boundingBox === 'function'
+        ? await entry.boundingBox().catch(() => null)
+        : null;
+      return { index, entry, box };
+    }),
+  );
+
+  const retained = candidates.filter((candidate) => {
+    const candidateBox = candidate.box;
+    if (!candidateBox) {
+      return true;
+    }
+
+    return !candidates.some((other) => {
+      if (other.index === candidate.index || !other.box) {
+        return false;
+      }
+
+      const containsCandidate =
+        other.box.x <= candidateBox.x
+        && other.box.y <= candidateBox.y
+        && other.box.x + other.box.width >= candidateBox.x + candidateBox.width
+        && other.box.y + other.box.height >= candidateBox.y + candidateBox.height;
+      const isStrictlyLarger =
+        other.box.width * other.box.height > candidateBox.width * candidateBox.height;
+
+      return containsCandidate && isStrictlyLarger;
+    });
+  });
+
+  return {
+    count: retained.length,
+    nth(index: number) {
+      return retained[index]?.entry ?? rosterEntries.nth(index);
+    },
+  };
+}
+
+async function inspectHallContainer(
+  container: Locator,
+  index: number,
+): Promise<HallContainerInspection> {
+  const directEntries = container.locator(selectors.hall.rosterEntries);
+  const directInspection = await inspectHallContainerEntries(directEntries, index, 'direct');
+  const descendantEntries = container.locator(selectors.hall.descendantRosterEntries);
+  const descendantInspection = await inspectHallContainerEntries(descendantEntries, index, 'descendant');
+
+  const strategies = [directInspection, descendantInspection].sort((left, right) => {
+    if (left.acceptedEntryCount !== right.acceptedEntryCount) {
+      return right.acceptedEntryCount - left.acceptedEntryCount;
+    }
+    if (left.extractedNameCount !== right.extractedNameCount) {
+      return right.extractedNameCount - left.extractedNameCount;
+    }
+    if (left.repeatedEntryCount !== right.repeatedEntryCount) {
+      return right.repeatedEntryCount - left.repeatedEntryCount;
+    }
+    if (left.entryCount !== right.entryCount) {
+      return right.entryCount - left.entryCount;
+    }
+    return left.strategy === 'direct' ? -1 : 1;
+  });
+
+  return strategies[0];
 }
 
 async function readVisibleHomeBruteEntries(page: Page): Promise<HomeBruteEntryCandidate[]> {
@@ -423,7 +537,7 @@ export async function listHallRosterBrutes(
 
   logHallDiscovery(
     logger,
-    `Selected hall roster candidate #${selectedContainer.index} with ${selectedContainer.entryCount} entries, ${selectedContainer.acceptedEntryCount} structurally valid, ${selectedContainer.extractedNameCount} extracted names.`,
+    `Selected hall roster candidate #${selectedContainer.index} using ${selectedContainer.strategy} entry discovery with ${selectedContainer.entryCount} entries, ${selectedContainer.acceptedEntryCount} structurally valid, ${selectedContainer.extractedNameCount} extracted names.`,
   );
 
   if (selectedContainer.acceptedEntryCount === 0) {
@@ -445,6 +559,7 @@ export async function listHallRosterBrutes(
   });
 
   const bruteNames: string[] = [];
+  const acceptedSummaries: string[] = [];
   const rejectedSummaries: string[] = [];
   let structurallyValidEntries = 0;
   let entriesWithoutNames = 0;
@@ -452,6 +567,7 @@ export async function listHallRosterBrutes(
     const inspection = await inspectHallCandidate(selectedContainer.rosterEntries.nth(index));
     if (inspection.accepted && inspection.bruteName) {
       bruteNames.push(inspection.bruteName);
+      acceptedSummaries.push(`#${index}:${inspection.bruteName}`);
       continue;
     }
 
@@ -463,7 +579,7 @@ export async function listHallRosterBrutes(
     }
 
     if (inspection.summary) {
-      rejectedSummaries.push(inspection.summary);
+      rejectedSummaries.push(`#${index}:${inspection.reason}:${inspection.summary}`);
     }
   }
 
@@ -487,6 +603,18 @@ export async function listHallRosterBrutes(
     );
   }
 
+  if (acceptedSummaries.length > 0) {
+    logHallDiscovery(
+      logger,
+      `Accepted hall entries (${acceptedSummaries.length}/${selectedContainer.entryCount}): ${acceptedSummaries.slice(0, HALL_REJECTION_SAMPLE_LIMIT).join(' || ')}`,
+    );
+  }
+  if (rejectedSummaries.length > 0) {
+    logHallDiscovery(
+      logger,
+      `Rejected hall entries (${rejectedSummaries.length}/${selectedContainer.entryCount}): ${rejectedSummaries.slice(0, HALL_REJECTION_SAMPLE_LIMIT).join(' || ')}`,
+    );
+  }
   logHallDiscovery(logger, `Resolved ${dedupedNames.length} hall brute name(s): ${dedupedNames.join(', ')}`);
   return dedupedNames;
 }

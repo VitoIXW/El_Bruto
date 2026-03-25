@@ -23,6 +23,18 @@ async function navigateToTargetBrute(page: Page, config: RunConfig, logger: Logg
   return waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login');
 }
 
+export async function continueToConfiguredBrute(
+  page: Page,
+  config: RunConfig,
+  logger: Logger,
+): Promise<StateDetectionDetails> {
+  if (!config.targetBruteName && !extractTargetBruteName(config.targetUrl)) {
+    throw new Error('Direct brute continuation requires an explicit target brute.');
+  }
+
+  return navigateToTargetBrute(page, config, logger);
+}
+
 export async function waitForLoginSubmitTransition(
   page: Page,
   logger: Logger,

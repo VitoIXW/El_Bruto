@@ -6,9 +6,9 @@ import { accountRunHasFailure } from './game/roster';
 import { createLogger } from './reporting/logger';
 import { formatAccountSummary, formatSummary } from './reporting/summary';
 import { runAllBrutes } from './game/account-runner';
-import { runBrute } from './game/brute-runner';
+import { runBrute, runCurrentBrute } from './game/brute-runner';
 import { listHallRosterBrutes } from './game/navigation';
-import { bootstrapToAuthenticatedHome } from './game/startup';
+import { bootstrapToAuthenticatedHome, continueToConfiguredBrute } from './game/startup';
 import { createConsolePrompter, promptForAccountSelection, promptForRunSelection } from './ui/interactive';
 import type { RunConfig, RunSummary } from './types/run-types';
 
@@ -56,7 +56,10 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
 
       const summaries: RunSummary[] = [];
       for (const bruteName of selection.bruteNames) {
-        const summary = await runBrute(page, buildBruteRunConfig(interactiveConfig, bruteName), logger);
+        const bruteConfig = buildBruteRunConfig(interactiveConfig, bruteName);
+        logger.info(`Continuing interactive selection directly to ${bruteConfig.targetUrl}.`);
+        const state = await continueToConfiguredBrute(page, bruteConfig, logger);
+        const summary = await runCurrentBrute(page, bruteConfig, logger, state);
         summaries.push(summary);
         logger.info(formatSummary(summary));
       }

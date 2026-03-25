@@ -31,6 +31,9 @@ export const selectors = {
       '#root .MuiPaper-root, #root [class*="MuiPaper" i], #root [class*="paper" i]',
     rosterEntries:
       ':scope > .MuiBox-root, :scope > [class*="box" i], :scope > div',
+    descendantRosterEntries:
+      '.MuiBox-root:has(.MuiTypography-root):has(img[alt="strength"], img[alt="agility"], img[alt="speed"], img[alt*="strength" i], img[alt*="agility" i], img[alt*="speed" i]):has([aria-label*="combates" i], [aria-label*="fights" i], [aria-label*="quedan" i]), ' +
+      '[class*="box" i]:has([class*="MuiTypography-root" i], [class*="typography" i]):has(img[alt="strength"], img[alt="agility"], img[alt="speed"], img[alt*="strength" i], img[alt*="agility" i], img[alt*="speed" i]):has([aria-label*="combates" i], [aria-label*="fights" i], [aria-label*="quedan" i])',
     entryName:
       '.MuiTypography-root, [class*="MuiTypography-root" i], [class*="typography" i]',
     entryStatIcons:
