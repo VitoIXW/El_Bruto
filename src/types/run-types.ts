@@ -1,4 +1,7 @@
 export type PageState =
+  | 'public_home'
+  | 'login_form'
+  | 'authenticated_home'
   | 'cell_ready'
   | 'cell_resting'
   | 'arena_selection'
@@ -39,6 +42,12 @@ export interface RunConfig {
   loginTimeoutMs: number;
   stepTimeoutMs: number;
   maxActionRetries: number;
+}
+
+export interface LoginCredentials {
+  username: string;
+  password: string;
+  source: 'environment' | 'file';
 }
 
 export interface StateDetectionDetails {

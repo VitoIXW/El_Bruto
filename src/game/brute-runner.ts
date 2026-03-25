@@ -121,6 +121,9 @@ export async function runCurrentBrute(
             errorsOccurred,
             artifacts,
           };
+        case 'public_home':
+        case 'login_form':
+        case 'authenticated_home':
         case 'login_required':
         case 'unknown':
           logger.warn(`Transient state ${state.state} detected at ${page.url()}. Waiting for stabilization.`);

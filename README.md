@@ -18,9 +18,10 @@ Given a target brute cell URL, the tool:
 
 1. Launches a visible Chromium browser with a persistent Playwright profile.
 2. Opens the EternalTwin root page first.
-3. Waits for you to log in manually if needed.
-4. Navigates to the target brute.
-5. Detects the current page state.
+3. Detects whether it is on the public home, login form, or authenticated home.
+4. Loads credentials from a local-only source when login is required.
+5. Signs in automatically, waits for the authenticated home, and enters the first brute from the home roster.
+6. Detects the current page state.
 6. Runs either:
    - a single-brute fight loop
    - or an all-brutes roster loop that advances with `Next Brute`
@@ -28,8 +29,9 @@ Given a target brute cell URL, the tool:
 The current Phase A flow supports:
 
 - login bootstrap from the site root
+- automatic login from local-only credentials
+- home-based first-brute entry
 - session reuse through a persistent browser profile
-- target brute resolution after login
 - single-brute execution
 - all-brutes execution by traversing the roster cyclically
 - arena entry
@@ -96,12 +98,28 @@ npm run start -- --mode all-brutes --url "https://brute.eternaltwin.org/ExampleB
 - `--logs-dir <path>`
 - `--login-timeout-ms <number>`
 
+### Local credentials
+
+Automatic login reads credentials from one of these local-only sources:
+
+1. Environment variables `ET_USERNAME` and `ET_PASSWORD`
+2. A gitignored file named `.credentials.local.json` in the project root
+
+Example file contents:
+
+```json
+{
+  "username": "EXAMPLE_USERNAME",
+  "password": "EXAMPLE_PASSWORD"
+}
+```
+
 ### Typical first run
 
 1. Start the command.
 2. A visible browser opens.
-3. If you are logged out, the tool waits for you to log in manually.
-4. After login stabilizes, the tool moves to the target brute.
+3. If you are logged out, the tool clicks `Conectarse` / `Log in`, submits local credentials, and waits for the authenticated home.
+4. The tool clicks the first brute entry from the home roster and continues from that brute cell.
 5. In `single` mode, it attacks until the brute is resting or another terminal state is reached.
 6. In `all-brutes` mode, it processes the current brute, advances to the next brute, and stops when the roster cycle closes or a safe stop condition is reached.
 
@@ -117,6 +135,9 @@ The runner uses an explicit state machine instead of a fixed click script.
 
 Recognized states include:
 
+- `public_home`
+- `login_form`
+- `authenticated_home`
 - `login_required`
 - `cell_ready`
 - `cell_resting`
@@ -187,6 +208,8 @@ The current implementation is intended to work with both:
 Important state detection already supports both languages for the areas we had to validate live, including:
 
 - public login landing markers
+- public-home and login-form detection
+- authenticated-home first-brute entry links
 - brute-not-found public landing markers
 - resting detection
 - pre-fight start control text
@@ -205,6 +228,8 @@ Main modules:
   - CLI argument parsing
 - `src/config.ts`
   - runtime config construction
+- `src/auth/credentials.ts`
+  - local-only credential loading
 - `src/browser/session.ts`
   - persistent Playwright session bootstrapping
 - `src/game/brute-runner.ts`
@@ -247,6 +272,7 @@ npm run check
 - The site is dynamic, so some transitions briefly appear as `unknown` before stabilizing.
 - All-brutes mode depends on the in-game `Next Brute` / `Siguiente Bruto` control and assumes it traverses the roster cyclically.
 - The tool assumes the current EternalTwin UI structure that was observed during live testing.
+- Authenticated-home entry assumes the top-left roster area exposes clickable brute icon links inside `main`, and that those links include an icon/avatar-like child element so the runner can choose the visible top-left brute rather than any generic `/cell` link elsewhere on the page.
 - If the game changes route shapes, button structure, or text labels, selectors may need updates.
 - Level-up choice remains manual by design.
 

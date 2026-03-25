@@ -7,6 +7,7 @@ export interface StateSignals {
   hasPublicLoginButton: boolean;
   hasSearchBruteInput: boolean;
   hasPublicBruteNotFoundText: boolean;
+  hasAuthenticatedHomeMarker: boolean;
   hasUnknownBruteUrl: boolean;
   hasArenaLink: boolean;
   hasArenaWelcomeText: boolean;
@@ -25,15 +26,32 @@ export interface StateSignals {
 export function classifyState(signals: StateSignals): StateDetectionDetails {
   const notes: string[] = [];
   let state: PageState = 'unknown';
+  const pathname = new URL(signals.url).pathname;
+  const isRootPath = pathname === '/';
 
-  if (
-    signals.hasLoginForm ||
-    signals.hasPasswordInput ||
-    (signals.hasPublicLoginButton && signals.hasSearchBruteInput) ||
-    (
-      signals.hasUnknownBruteUrl &&
-      (signals.hasPublicLoginButton || signals.hasSearchBruteInput || signals.hasPublicBruteNotFoundText)
-    )
+  if (signals.hasLoginForm || signals.hasPasswordInput) {
+    state = 'login_form';
+    notes.push('login form markers detected');
+  } else if (
+    isRootPath &&
+    (signals.hasPublicLoginButton || signals.hasSearchBruteInput || signals.hasPublicBruteNotFoundText) &&
+    !signals.hasAuthenticatedHomeMarker
+  ) {
+    state = 'public_home';
+    notes.push('public home markers detected');
+  } else if (isRootPath && signals.hasAuthenticatedHomeMarker && !signals.hasPublicLoginButton) {
+    state = 'authenticated_home';
+    notes.push('authenticated home markers detected');
+  } else if (
+    !isRootPath &&
+    (signals.hasPublicLoginButton || signals.hasSearchBruteInput || signals.hasPublicBruteNotFoundText) &&
+    !signals.hasAuthenticatedHomeMarker
+  ) {
+    state = 'login_required';
+    notes.push('logged-out non-home markers detected');
+  } else if (
+    signals.hasUnknownBruteUrl &&
+    (signals.hasPublicLoginButton || signals.hasSearchBruteInput || signals.hasPublicBruteNotFoundText)
   ) {
     state = 'login_required';
     notes.push('login markers detected');

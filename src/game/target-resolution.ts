@@ -1,6 +1,6 @@
 import type { PageState, StateDetectionDetails } from '../types/run-types';
 
-const TRANSIENT_STATES: PageState[] = ['login_required', 'unknown'];
+const TRANSIENT_STATES: PageState[] = ['public_home', 'login_form', 'authenticated_home', 'login_required', 'unknown'];
 
 export function extractTargetBruteName(targetUrl: string): string | undefined {
   const match = targetUrl.match(/brute\.eternaltwin\.org\/([^/]+)\/(cell|arena|fight)/i);
