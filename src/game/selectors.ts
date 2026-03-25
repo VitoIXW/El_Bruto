@@ -33,6 +33,8 @@ export const selectors = {
     opponentLinks: 'a[href*="/fight/"], button[formaction*="/fight/"], button[onclick*="/fight/"]',
     opponentCards:
       'div.MuiGrid-root.MuiGrid-item.MuiGrid-grid-xs-12.MuiGrid-grid-sm-6',
+    opponentNameCandidates:
+      'h1, h2, h3, h4, h5, [data-testid="brute-name"], a[href$="/cell"], a[href*="/cell?"], [title]',
     anyFightStartLink: 'a[href*="/fight/"]',
   },
   preFight: {
@@ -60,4 +62,8 @@ export function buildCellUrl(origin: string, bruteName: string): string {
 
 export function normalizeText(value: string | null | undefined): string {
   return (value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+export function stripHtmlTags(value: string): string {
+  return normalizeText(value.replace(/<[^>]+>/g, ' '));
 }

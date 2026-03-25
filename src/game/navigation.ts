@@ -20,6 +20,20 @@ export function pickTopLeftHomeBruteEntry(
   })[0];
 }
 
+export interface ArenaOpponentOption {
+  name?: string;
+  control: Locator;
+}
+
+const ARENA_NAME_BLACKLIST = new Set([
+  'fight',
+  'combate',
+  'start fight',
+  'comenzar el combate',
+  'go!',
+  'vs',
+]);
+
 export function extractBruteNameFromUrl(url: string): string | undefined {
   const match = url.match(/brute\.eternaltwin\.org\/([^/]+)\/(cell|arena|fight|versus)/i);
   return match?.[1];
@@ -93,21 +107,112 @@ export async function clickNextBrute(page: Page): Promise<void> {
   await page.locator(selectors.cell.nextBruteControl).first().click();
 }
 
-export async function chooseFirstOpponent(page: Page): Promise<void> {
+export function extractArenaOpponentName(text: string): string | undefined {
+  const lines = text
+    .split('\n')
+    .map((line) => normalizeText(line))
+    .filter(Boolean);
+
+  for (const line of lines) {
+    const lowerLine = line.toLowerCase();
+    if (ARENA_NAME_BLACKLIST.has(lowerLine)) {
+      continue;
+    }
+
+    if (/\d+\s*%/.test(line) || /^vs\.?$/i.test(line)) {
+      continue;
+    }
+
+    if (line.length < 2) {
+      continue;
+    }
+
+    return line;
+  }
+
+  return undefined;
+}
+
+async function readArenaOpponentName(card: Locator): Promise<string | undefined> {
+  const nameCandidates = card.locator(selectors.arena.opponentNameCandidates);
+  const candidateCount = await nameCandidates.count();
+
+  for (let index = 0; index < candidateCount; index += 1) {
+    const candidate = nameCandidates.nth(index);
+    const text = extractArenaOpponentName(await candidate.innerText().catch(() => ''));
+    if (text) {
+      return text;
+    }
+
+    const title = normalizeText(await candidate.getAttribute('title').catch(() => ''));
+    if (title && !ARENA_NAME_BLACKLIST.has(title.toLowerCase())) {
+      return title;
+    }
+  }
+
+  return extractArenaOpponentName(await card.innerText().catch(() => ''));
+}
+
+export async function readVisibleArenaOpponents(page: Page): Promise<ArenaOpponentOption[]> {
+  const opponentCards = page.locator(selectors.arena.opponentCards);
+  const cardCount = await opponentCards.count();
+  const cardOptions: ArenaOpponentOption[] = [];
+
+  for (let index = 0; index < cardCount; index += 1) {
+    const card = opponentCards.nth(index);
+    if (!(await hasVisible(card))) {
+      continue;
+    }
+
+    cardOptions.push({
+      name: await readArenaOpponentName(card),
+      control: card,
+    });
+  }
+
+  if (cardOptions.length > 0) {
+    return cardOptions;
+  }
+
   const explicitFightControls = page.locator(selectors.arena.opponentLinks);
   const explicitCount = await explicitFightControls.count();
-  if (explicitCount > 0) {
-    await explicitFightControls.first().click();
+  const explicitOptions: ArenaOpponentOption[] = [];
+
+  for (let index = 0; index < explicitCount; index += 1) {
+    const control = explicitFightControls.nth(index);
+    if (!(await hasVisible(control))) {
+      continue;
+    }
+
+    explicitOptions.push({
+      name: extractArenaOpponentName(await control.innerText().catch(() => '')),
+      control,
+    });
+  }
+
+  return explicitOptions;
+}
+
+export async function chooseNamedOpponent(page: Page, opponentName: string): Promise<boolean> {
+  const opponents = await readVisibleArenaOpponents(page);
+  const normalizedTarget = normalizeText(opponentName).toLowerCase();
+  const match = opponents.find((opponent) => opponent.name?.toLowerCase() === normalizedTarget);
+  if (!match) {
+    return false;
+  }
+
+  await match.control.click();
+  return true;
+}
+
+export async function chooseFirstOpponent(page: Page): Promise<void> {
+  const opponents = await readVisibleArenaOpponents(page);
+  if (opponents.length > 0) {
+    await opponents[0].control.click();
     return;
   }
 
-  const opponentCards = page.locator(selectors.arena.opponentCards);
-  const cardCount = await opponentCards.count();
-  if (cardCount === 0) {
-    throw new Error('No arena opponent controls or rival cards were found.');
-  }
-
-  await opponentCards.first().click();
+  throw new Error('No arena opponent controls or rival cards were found.');
 }
 
 export async function startFight(page: Page): Promise<void> {

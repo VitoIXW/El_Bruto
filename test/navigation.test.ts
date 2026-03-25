@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { extractBruteNameFromUrl, pickTopLeftHomeBruteEntry } from '../src/game/navigation';
+import {
+  extractArenaOpponentName,
+  extractBruteNameFromUrl,
+  pickTopLeftHomeBruteEntry,
+} from '../src/game/navigation';
 
 test('extractBruteNameFromUrl resolves brute identity from a special cell route', () => {
   assert.equal(
@@ -33,4 +37,15 @@ test('pickTopLeftHomeBruteEntry prefers the top-left roster candidate over later
 
 test('pickTopLeftHomeBruteEntry returns undefined when no roster candidates are available', () => {
   assert.equal(pickTopLeftHomeBruteEntry([]), undefined);
+});
+
+test('extractArenaOpponentName skips generic arena labels and keeps the visible rival name', () => {
+  assert.equal(
+    extractArenaOpponentName('Fight\nOpponentBrute\n62%'),
+    'OpponentBrute',
+  );
+  assert.equal(
+    extractArenaOpponentName('Comenzar el combate\nTargetBrute\nRatio de Victoria 41%'),
+    'TargetBrute',
+  );
 });
