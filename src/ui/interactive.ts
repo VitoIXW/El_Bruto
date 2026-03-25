@@ -10,6 +10,7 @@ export interface InteractivePrompter {
   write(message: string): void;
   chooseOne?(message: string, options: string[]): Promise<number>;
   chooseMany?(message: string, options: string[]): Promise<number[]>;
+  clearScreen?(): void;
   close(): Promise<void> | void;
 }
 
@@ -30,7 +31,13 @@ interface TtyLikeInput extends Readable {
 
 interface TtyLikeOutput extends Writable {
   isTTY?: boolean;
+  getColorDepth?(): number;
 }
+
+const ANSI_RESET = '\u001B[0m';
+const ANSI_ACTIVE_BLUE = '\u001B[38;5;39m';
+const ANSI_DIM = '\u001B[2m';
+const ANSI_CLEAR_SCREEN = '\u001B[2J\u001B[3J\u001B[H';
 
 function parsePositiveIndex(input: string, maxValue: number): number | undefined {
   const numericValue = Number.parseInt(input, 10);
@@ -53,6 +60,7 @@ export function parseMultiSelection(input: string, availableItems: string[]): st
 export function createConsolePrompter(
   input: Readable = process.stdin,
   output: Writable = process.stdout,
+  options: { allowScreenClears?: boolean } = {},
 ): InteractivePrompter {
   const rl = readline.createInterface({ input, output });
   const ttyInput = input as TtyLikeInput;
@@ -61,6 +69,8 @@ export function createConsolePrompter(
     ttyInput.isTTY === true
     && ttyOutput.isTTY === true
     && typeof ttyInput.setRawMode === 'function';
+  const supportsColor = ttyOutput.isTTY === true && (ttyOutput.getColorDepth?.() ?? 0) >= 8;
+  const allowScreenClears = options.allowScreenClears !== false;
 
   async function chooseFromList(message: string, options: string[], allowMultiple: boolean): Promise<number[]> {
     if (!supportsInteractiveSelection) {
@@ -92,9 +102,13 @@ export function createConsolePrompter(
         ...options.map((option, index) => {
           const pointer = index === cursorIndex ? '>' : ' ';
           const marker = allowMultiple ? `[${selectedIndexes.has(index) ? 'x' : ' '}] ` : '';
-          return `${pointer} ${marker}${option}`;
+          const line = `${pointer} ${marker}${option}`;
+          if (index !== cursorIndex || !supportsColor) {
+            return line;
+          }
+          return `${ANSI_ACTIVE_BLUE}${line}${ANSI_RESET}`;
         }),
-        instructionLine,
+        supportsColor ? `${ANSI_DIM}${instructionLine}${ANSI_RESET}` : instructionLine,
       ];
 
       output.write(`${lines.join('\n')}\n`);
@@ -106,7 +120,11 @@ export function createConsolePrompter(
         ttyInput.setRawMode?.(false);
         ttyInput.off('keypress', onKeypress);
         ttyInput.pause();
-        output.write('\n');
+        if (allowScreenClears) {
+          output.write(ANSI_CLEAR_SCREEN);
+        } else {
+          output.write('\n');
+        }
         rl.resume();
       };
 
@@ -184,6 +202,12 @@ export function createConsolePrompter(
     },
     async chooseMany(message: string, options: string[]) {
       return chooseFromList(message, options, true);
+    },
+    clearScreen() {
+      if (!supportsInteractiveSelection || !allowScreenClears) {
+        return;
+      }
+      output.write(ANSI_CLEAR_SCREEN);
     },
     close() {
       rl.close();

@@ -29,10 +29,14 @@ function buildAllBrutesRunConfig(baseConfig: RunConfig, bruteName: string): RunC
 }
 
 async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<typeof createLogger>): Promise<void> {
-  const prompter = createConsolePrompter();
+  const prompter = createConsolePrompter(process.stdin, process.stdout, {
+    allowScreenClears: !baseConfig.debug,
+  });
   try {
+    prompter.clearScreen?.();
     const savedAccounts = loadSavedAccounts();
     const accountChoice = await promptForAccountSelection(savedAccounts, prompter);
+    prompter.clearScreen?.();
 
     if (accountChoice.accountToSave) {
       saveAccount(accountChoice.accountToSave);
@@ -53,6 +57,7 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
       logger.info('Authenticated home detected. Opening /hall to discover account brutes.');
       const bruteNames = await listHallRosterBrutes(page, interactiveConfig.bootstrapUrl, logger);
       const selection = await promptForRunSelection(bruteNames, prompter);
+      prompter.clearScreen?.();
 
       if (selection.executionMode === 'all-brutes') {
         const firstBruteName = selection.bruteNames[0];
