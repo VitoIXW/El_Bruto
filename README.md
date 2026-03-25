@@ -1,111 +1,48 @@
 # El Bruto Arena Runner
 
-A TypeScript + Playwright CLI that automates EternalTwin La Brute arena fights in two modes:
+CLI en TypeScript + Playwright para automatizar combates de **La Brute / El Bruto** en EternalTwin.
 
-- `single`: run one target brute
-- `all-brutes`: iterate through the account roster with `Next Brute` / `Siguiente Bruto`
+Ahora mismo el flujo real es este:
 
-It is designed to be:
+1. abre la web principal
+2. inicia sesión automáticamente con credenciales locales
+3. entra al primer bruto visible de la cuenta
+4. pelea en `single` o recorre todo el roster en `all-brutes`
 
-- robust against transient page states
-- easy to debug
-- safe to run manually on demand
-- usable for both one-brute and roster-wide manual runs
+## Qué hace
 
-## What It Does
+El proyecto permite:
 
-Given a target brute cell URL, the tool:
+- iniciar sesión automáticamente
+- entrar al primer bruto visible de la cuenta
+- lanzar combates hasta que el bruto quede descansando
+- recorrer todos los brutos con `Siguiente Bruto` en modo `all-brutes`
+- elegir rival en arena usando el menor `Ratio de Victoria` / `Win Rate` público cuando ese dato se puede resolver
+- guardar logs y artifacts para depurar errores
 
-1. Launches a visible Chromium browser with a persistent Playwright profile.
-2. Opens the EternalTwin root page first.
-3. Detects whether it is on the public home, login form, or authenticated home.
-4. Loads credentials from a local-only source when login is required.
-5. Signs in automatically, waits for the authenticated home, and enters the first brute from the home roster.
-6. Detects the current page state.
-6. Runs either:
-   - a single-brute fight loop
-   - or an all-brutes roster loop that advances with `Next Brute`
-
-The current Phase A flow supports:
-
-- login bootstrap from the site root
-- automatic login from local-only credentials
-- home-based first-brute entry
-- session reuse through a persistent browser profile
-- single-brute execution
-- all-brutes execution by traversing the roster cyclically
-- arena entry
-- rival selection
-- pre-fight detection on `/versus/...`
-- starting the fight
-- skipping back to the current brute cell after combat
-- stopping when the brute is resting
-- stopping safely when manual intervention is required
-
-## Current Scope
-
-This version can:
-
-- process a single requested brute
-- process all brutes reachable through the in-game `Next Brute` / `Siguiente Bruto` control
-
-It does **not** yet:
-
-- choose rivals strategically
-- automate level-up choice decisions
-- schedule runs automatically
-
-## Requirements
+## Requisitos
 
 - Node.js 20+
 - npm
-- Playwright Chromium browser installed locally
+- Playwright Chromium
 
-## Installation
+## Instalación
 
 ```bash
 npm install
 npx playwright install chromium
 ```
 
-## Build
+## Credenciales locales
 
-```bash
-npm run build
-```
+La sesión se automatiza con credenciales guardadas **solo en local**.
 
-## Run
+Puedes usar una de estas dos opciones:
 
-Example:
+1. Variables de entorno `ET_USERNAME` y `ET_PASSWORD`
+2. Archivo local `/.credentials.local.json`
 
-```bash
-npm run start -- --url "https://brute.eternaltwin.org/ExampleBrute/cell" --debug
-```
-
-All brutes mode:
-
-```bash
-npm run start -- --mode all-brutes --url "https://brute.eternaltwin.org/ExampleBrute/cell" --debug
-```
-
-### Supported CLI options
-
-- `--url <target-cell-url>`
-- `--mode <single|all-brutes>`
-- `--debug`
-- `--profile-dir <path>`
-- `--artifacts-dir <path>`
-- `--logs-dir <path>`
-- `--login-timeout-ms <number>`
-
-### Local credentials
-
-Automatic login reads credentials from one of these local-only sources:
-
-1. Environment variables `ET_USERNAME` and `ET_PASSWORD`
-2. A gitignored file named `.credentials.local.json` in the project root
-
-Example file contents:
+Ejemplo:
 
 ```json
 {
@@ -114,180 +51,90 @@ Example file contents:
 }
 ```
 
-### Typical first run
+También tienes una plantilla en:
 
-1. Start the command.
-2. A visible browser opens.
-3. If you are logged out, the tool clicks `Conectarse` / `Log in`, submits local credentials, and waits for the authenticated home.
-4. The tool clicks the first brute entry from the home roster and continues from that brute cell.
-5. In `single` mode, it attacks until the brute is resting or another terminal state is reached.
-6. In `all-brutes` mode, it processes the current brute, advances to the next brute, and stops when the roster cycle closes or a safe stop condition is reached.
+- [\.credentials.local.json.example](/home/vito/repositorios/el_bruto/.credentials.local.json.example)
 
-### Typical later runs
+Ese archivo local está ignorado por git y no debe subirse.
 
-The browser profile is stored in `playwright-profile/`, so cookies and session state are reused.
+## Uso normal
 
-That means you usually do **not** need to log in again unless EternalTwin expires the session.
-
-## How It Works
-
-The runner uses an explicit state machine instead of a fixed click script.
-
-Recognized states include:
-
-- `public_home`
-- `login_form`
-- `authenticated_home`
-- `login_required`
-- `cell_ready`
-- `cell_resting`
-- `arena_selection`
-- `pre_fight`
-- `fight`
-- `level_up`
-- `unknown`
-
-The runner intentionally tolerates short-lived transient states, especially after:
-
-- login redirects
-- SPA hydration
-- moving from arena to versus
-- returning from fight to cell
-- switching between brutes in roster mode
-
-This is why logs may briefly show `unknown` before stabilizing to a known state.
-
-## Output
-
-### Logs
-
-Run logs are written to:
-
-- `logs/`
-
-### Failure artifacts
-
-If an unexpected error occurs, the tool writes:
-
-- a screenshot
-- an HTML snapshot
-
-to:
-
-- `artifacts/`
-
-### Summary
-
-At the end of a run, the tool prints a summary including:
-
-- brute name
-- fights completed
-- final status
-- whether resting was reached
-- whether level-up was detected
-- whether errors occurred
-- artifact paths if applicable
-
-In `all-brutes` mode, it also prints an account summary including:
-
-- started brute
-- whether the roster cycle completed
-- whether advancing to the next brute failed
-- total brutes processed
-- total fights completed
-- counts for resting, manual intervention, and errors
-- per-brute results
-
-## Language Support
-
-The current implementation is intended to work with both:
-
-- English
-- Spanish
-
-Important state detection already supports both languages for the areas we had to validate live, including:
-
-- public login landing markers
-- public-home and login-form detection
-- authenticated-home first-brute entry links
-- brute-not-found public landing markers
-- resting detection
-- pre-fight start control text
-
-Other languages are **not** currently guaranteed.
-
-Even between English and Spanish, support is based on the real EternalTwin UI that was observed during implementation, so future UI changes may require narrow selector updates.
-
-## Project Structure
-
-Main modules:
-
-- `src/main.ts`
-  - entrypoint
-- `src/cli.ts`
-  - CLI argument parsing
-- `src/config.ts`
-  - runtime config construction
-- `src/auth/credentials.ts`
-  - local-only credential loading
-- `src/browser/session.ts`
-  - persistent Playwright session bootstrapping
-- `src/game/brute-runner.ts`
-  - main orchestration/state-machine loop
-- `src/game/account-runner.ts`
-  - all-brutes orchestration
-- `src/game/detector.ts`
-  - page signal collection
-- `src/game/state.ts`
-  - state classification
-- `src/game/selectors.ts`
-  - centralized selectors
-- `src/game/navigation.ts`
-  - page actions and navigation helpers
-- `src/game/roster.ts`
-  - roster traversal and next-brute settling helpers
-- `src/game/arena.ts`
-  - arena readiness and fight-launch flow
-- `src/game/target-resolution.ts`
-  - post-login target brute resolution
-- `src/game/startup.ts`
-  - shared login/bootstrap and stabilization helpers
-- `src/game/retry.ts`
-  - retry safety helpers
-- `src/reporting/`
-  - logs, summaries, failure artifacts
-
-## Validation
-
-Available checks:
+Primero compila:
 
 ```bash
 npm run build
-npm test
-npm run check
 ```
 
-## Limitations
+Luego ejecuta uno de estos modos.
 
-- The site is dynamic, so some transitions briefly appear as `unknown` before stabilizing.
-- All-brutes mode depends on the in-game `Next Brute` / `Siguiente Bruto` control and assumes it traverses the roster cyclically.
-- The tool assumes the current EternalTwin UI structure that was observed during live testing.
-- Authenticated-home entry assumes the top-left roster area exposes clickable brute icon links inside `main`, and that those links include an icon/avatar-like child element so the runner can choose the visible top-left brute rather than any generic `/cell` link elsewhere on the page.
-- If the game changes route shapes, button structure, or text labels, selectors may need updates.
-- Level-up choice remains manual by design.
+### Modo `single`
 
-## Safety Notes
+Usa el primer bruto visible de la cuenta y pelea con él hasta que se quede sin combates o aparezca una parada segura.
 
-Use this project at your own risk.
+```bash
+npm run start -- --mode single --debug
+```
 
-Browser-game automation may be subject to game rules or terms of service. You are responsible for deciding whether and how to use it.
+### Modo `all-brutes`
 
-## Future Work
+Procesa el roster completo avanzando con `Siguiente Bruto`.
 
-Likely next steps:
+```bash
+npm run start -- --mode all-brutes --debug
+```
 
-- improve live-state stabilization around transient SPA transitions
-- make brute selection configurable by name instead of full URL only
-- add optional scheduling
-- produce richer run reports
-- add smarter opponent-selection rules
+## Opciones útiles
+
+- `--mode single|all-brutes`
+- `--debug`
+- `--profile-dir <ruta>`
+- `--artifacts-dir <ruta>`
+- `--logs-dir <ruta>`
+- `--login-timeout-ms <ms>`
+- `--url <url>`
+
+Nota sobre `--url`:
+
+- hoy en día el arranque real entra por la home autenticada y abre el primer bruto visible
+- `--url` sigue existiendo por compatibilidad y para construir la base del sitio, pero ya no es la forma principal de elegir el bruto en el arranque
+
+## Qué verás al ejecutarlo
+
+- se abre un navegador visible
+- si hace falta, pulsa `Conectarse` / `Log in`
+- rellena usuario y contraseña
+- entra en la cuenta
+- abre el primer bruto visible
+- empieza a pelear o a recorrer el roster según el modo
+
+## Logs y artifacts
+
+Los logs se guardan en:
+
+- `logs/`
+
+Si ocurre un error inesperado, también se guardan:
+
+- captura de pantalla
+- snapshot HTML
+
+en:
+
+- `artifacts/`
+
+## Estado actual
+
+El proyecto ya cubre el flujo práctico de uso, pero todavía hay límites:
+
+- algunas decisiones siguen dependiendo del HTML real que devuelva EternalTwin
+- cambios en la interfaz pueden obligar a ajustar selectores o parsers
+- la selección de rival depende de que el win-rate público se pueda resolver correctamente
+- las decisiones manuales de level-up siguen fuera de alcance
+
+## Comandos de desarrollo
+
+```bash
+npm run build
+npm run test
+npm run check
+```
