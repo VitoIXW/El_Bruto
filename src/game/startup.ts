@@ -1,11 +1,34 @@
 import type { Page } from 'playwright';
 
+import { loadLoginCredentials } from '../auth/credentials';
 import type { Logger } from '../reporting/logger';
 import type { RunConfig, StateDetectionDetails } from '../types/run-types';
 import { detectState } from './detector';
-import { extractTargetBruteName, isTargetBruteLoaded, isTransientState } from './target-resolution';
+import { clickFirstHomeBrute, clickPublicLogin, submitLoginForm } from './navigation';
+import { isTransientState } from './target-resolution';
 
 export type StableStatePhase = 'login' | 'post_login';
+
+function isActionablePostSubmitState(state: StateDetectionDetails): boolean {
+  return state.state !== 'login_form' && !isTransientState(state.state, 'login');
+}
+
+export async function waitForLoginSubmitTransition(
+  page: Page,
+  logger: Logger,
+  timeoutMs: number,
+): Promise<StateDetectionDetails> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const state = await detectState(page, logger);
+    if (isActionablePostSubmitState(state)) {
+      return state;
+    }
+    await page.waitForTimeout(1000);
+  }
+
+  throw new Error(`Login submit transition timeout waiting for an actionable state after ${timeoutMs}ms.`);
+}
 
 export async function waitForStableGameState(
   page: Page,
@@ -16,36 +39,13 @@ export async function waitForStableGameState(
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const state = await detectState(page, logger);
-    if (!isTransientState(state.state)) {
+    if (!isTransientState(state.state, phase)) {
       return state;
     }
     await page.waitForTimeout(1000);
   }
 
   throw new Error(`Stable game state timeout [phase=${phase}] reached after ${timeoutMs}ms.`);
-}
-
-export async function resolveTargetBruteAfterLogin(
-  page: Page,
-  config: RunConfig,
-  logger: Logger,
-  initialState: StateDetectionDetails,
-): Promise<StateDetectionDetails> {
-  const targetBruteName = extractTargetBruteName(config.targetUrl);
-  let state = initialState;
-
-  if (isTransientState(state.state)) {
-    state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login');
-  }
-
-  if (isTargetBruteLoaded(targetBruteName, state)) {
-    logger.info(`Target brute ${targetBruteName} is already loaded. Skipping redundant navigation.`);
-    return state;
-  }
-
-  logger.info(`Navigating to target brute ${config.targetUrl}`);
-  await page.goto(config.targetUrl, { waitUntil: 'domcontentloaded' });
-  return waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login');
 }
 
 export async function bootstrapIntoTargetBrute(
@@ -57,10 +57,31 @@ export async function bootstrapIntoTargetBrute(
   await page.goto(config.bootstrapUrl, { waitUntil: 'domcontentloaded' });
   let state = await detectState(page, logger);
 
-  if (state.state === 'login_required') {
-    logger.info(`Login required. Complete login in the browser window within ${config.loginTimeoutMs}ms.`);
-    state = await waitForStableGameState(page, logger, config.loginTimeoutMs, 'login');
+  while (true) {
+    switch (state.state) {
+      case 'public_home':
+        logger.info('Public home detected. Opening the login form.');
+        await clickPublicLogin(page);
+        state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'login');
+        continue;
+      case 'login_form': {
+        const credentials = loadLoginCredentials();
+        logger.info(`Login form detected. Submitting credentials from ${credentials.source}.`);
+        await submitLoginForm(page, credentials.username, credentials.password);
+        state = await waitForLoginSubmitTransition(page, logger, config.loginTimeoutMs);
+        continue;
+      }
+      case 'authenticated_home':
+        logger.info('Authenticated home detected. Opening the first brute from the roster.');
+        await clickFirstHomeBrute(page);
+        return waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login');
+      case 'login_required':
+      case 'unknown':
+        logger.info(`Waiting for startup state to stabilize from ${state.state}.`);
+        state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'login');
+        continue;
+      default:
+        return state;
+    }
   }
-
-  return resolveTargetBruteAfterLogin(page, config, logger, state);
 }

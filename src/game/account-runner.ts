@@ -2,6 +2,7 @@ import type { Page } from 'playwright';
 
 import type { Logger } from '../reporting/logger';
 import type { AccountRunSummary, RunConfig, RunSummary } from '../types/run-types';
+import { captureFailureArtifactsSafely } from '../reporting/artifacts';
 import { formatSummary } from '../reporting/summary';
 import { runCurrentBrute } from './brute-runner';
 import { detectState } from './detector';
@@ -138,8 +139,32 @@ function normalizeBruteSummary(summary: RunSummary, fallbackBruteName: string): 
 }
 
 export async function runAllBrutes(page: Page, config: RunConfig, logger: Logger): Promise<AccountRunSummary> {
-  let state = await bootstrapIntoTargetBrute(page, config, logger);
-  const startedBruteName = state.bruteNameFromPage ?? extractTargetBruteName(config.targetUrl) ?? 'unknown';
+  let state;
+  const startedBruteName = extractTargetBruteName(config.targetUrl) ?? 'unknown';
+
+  try {
+    state = await bootstrapIntoTargetBrute(page, config, logger);
+  } catch (error) {
+    const artifacts = await captureFailureArtifactsSafely(page, config.artifactsDir, 'bootstrap-failure', logger);
+    logger.error((error as Error).stack ?? String(error));
+
+    const artifactDetails = [
+      artifacts?.screenshotPath ? `Screenshot: ${artifacts.screenshotPath}` : undefined,
+      artifacts?.htmlPath ? `HTML snapshot: ${artifacts.htmlPath}` : undefined,
+    ]
+      .filter((detail): detail is string => Boolean(detail))
+      .join(' | ');
+    const failureReason = [
+      `Bootstrap failed before roster processing: ${String(error)}`,
+      artifactDetails,
+    ]
+      .filter(Boolean)
+      .join(' | ');
+
+    return summarizeAccountRun(startedBruteName, [], false, true, failureReason);
+  }
+
+  const bootstrapBruteName = state.bruteNameFromPage ?? startedBruteName;
   const visitedBrutes = new Set<string>();
   const bruteResults: RunSummary[] = [];
   let cycleCompleted = false;
@@ -147,7 +172,7 @@ export async function runAllBrutes(page: Page, config: RunConfig, logger: Logger
   let failureReason: string | undefined;
 
   while (true) {
-    const currentBruteName = state.bruteNameFromPage ?? startedBruteName;
+    const currentBruteName = state.bruteNameFromPage ?? bootstrapBruteName;
     if (shouldStopRosterCycle(visitedBrutes, currentBruteName)) {
       cycleCompleted = true;
       break;
@@ -173,5 +198,5 @@ export async function runAllBrutes(page: Page, config: RunConfig, logger: Logger
     }
   }
 
-  return summarizeAccountRun(startedBruteName, bruteResults, cycleCompleted, advanceFailed, failureReason);
+  return summarizeAccountRun(bootstrapBruteName, bruteResults, cycleCompleted, advanceFailed, failureReason);
 }

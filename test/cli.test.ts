@@ -40,3 +40,18 @@ test('next brute selector supports aria-label based controls', () => {
   assert.match(selectors.cell.nextBruteControl, /aria-label="Next Brute"/);
   assert.match(selectors.cell.nextBruteControl, /aria-label="Siguiente Bruto"/);
 });
+
+test('login submit selector supports localized Iniciar sesión text', () => {
+  assert.match(selectors.login.submitButton, /Iniciar sesión/);
+});
+
+test('login submit selector stays relative-safe for lookup inside the located form', () => {
+  assert.doesNotMatch(selectors.login.submitButton, /\bform\s+/);
+});
+
+test('login submit selector keeps generic submit controls and existing login labels', () => {
+  assert.match(selectors.login.submitButton, /button\[type="submit"\]/);
+  assert.match(selectors.login.submitButton, /input\[type="submit"\]/);
+  assert.match(selectors.login.submitButton, /Log in/);
+  assert.match(selectors.login.submitButton, /Conectarse/);
+});

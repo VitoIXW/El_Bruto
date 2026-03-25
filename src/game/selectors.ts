@@ -1,11 +1,22 @@
 export const selectors = {
   login: {
     loginForm: 'form[action*="login"], form:has(input[type="password"])',
+    usernameInput:
+      'input[name="username"], input[autocomplete="username"], input[type="text"], input[type="email"]',
     passwordInput: 'input[type="password"]',
     loginButton: 'a:has-text("Log in"), button:has-text("Log in"), a:has-text("Conectarse"), button:has-text("Conectarse")',
+    submitButton:
+      'button[type="submit"], input[type="submit"], button:has-text("Log in"), button:has-text("Conectarse"), button:has-text("Iniciar sesión")',
     searchBruteInput:
       'input[placeholder*="Search a Brute" i], input[aria-label*="Search a Brute" i], input[placeholder*="Buscar un bruto" i], input[aria-label*="Buscar un bruto" i]',
     bruteNotFoundText: 'text=/brute not found|bruto no encontrado/i',
+  },
+  home: {
+    authenticatedMarker:
+      'a[href$="/cell"], a[href*="/cell?"], button[aria-label*="brute" i], [data-testid*="brute" i]',
+    rosterBruteEntries:
+      'main a[href$="/cell"]:has(img, svg, canvas, [role="img"], [class*="avatar" i], [class*="icon" i]), ' +
+      'main a[href*="/cell?"]:has(img, svg, canvas, [role="img"], [class*="avatar" i], [class*="icon" i])',
   },
   cell: {
     arenaLink: 'a[href$="/arena"]',
@@ -22,6 +33,8 @@ export const selectors = {
     opponentLinks: 'a[href*="/fight/"], button[formaction*="/fight/"], button[onclick*="/fight/"]',
     opponentCards:
       'div.MuiGrid-root.MuiGrid-item.MuiGrid-grid-xs-12.MuiGrid-grid-sm-6',
+    opponentNameCandidates:
+      'h1, h2, h3, h4, h5, [data-testid="brute-name"], a[href$="/cell"], a[href*="/cell?"], [title]',
     anyFightStartLink: 'a[href*="/fight/"]',
   },
   preFight: {
@@ -49,4 +62,8 @@ export function buildCellUrl(origin: string, bruteName: string): string {
 
 export function normalizeText(value: string | null | undefined): string {
   return (value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+export function stripHtmlTags(value: string): string {
+  return normalizeText(value.replace(/<[^>]+>/g, ' '));
 }
