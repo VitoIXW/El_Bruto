@@ -2,23 +2,27 @@
 
 CLI en TypeScript + Playwright para automatizar combates de **La Brute / El Bruto** en EternalTwin.
 
-Ahora mismo el flujo real es este:
+El proyecto tiene ahora dos formas de uso:
 
-1. abre la web principal
-2. inicia sesión automáticamente con credenciales locales
-3. entra al primer bruto visible de la cuenta
-4. pelea en `single` o recorre todo el roster en `all-brutes`
+- **modo automático**, pensado para lanzarlo con parámetros desde terminal, scripts o cron
+- **modo interactivo**, pensado para abrir un pequeño flujo guiado en consola y elegir cuenta, brutos y modo de ejecución
 
 ## Qué hace
 
-El proyecto permite:
+Actualmente el runner puede:
 
-- iniciar sesión automáticamente
-- entrar al primer bruto visible de la cuenta
-- lanzar combates hasta que el bruto quede descansando
-- recorrer todos los brutos con `Siguiente Bruto` en modo `all-brutes`
+- iniciar sesión automáticamente en EternalTwin
+- usar cuentas locales guardadas solo en tu máquina
+- descubrir el roster de brutos de una cuenta desde `/hall`
+- ejecutar:
+  - un solo bruto
+  - varios brutos concretos
+  - todos los brutos de la cuenta
+- entrar directamente al `/cell` del bruto elegido
+- pelear hasta que el bruto quede descansando o aparezca una parada segura
+- recorrer el roster con `Siguiente Bruto` en modo `all-brutes`
 - elegir rival en arena usando el menor `Ratio de Victoria` / `Win Rate` público cuando ese dato se puede resolver
-- guardar logs y artifacts para depurar errores
+- guardar logs detallados y artifacts para depurar errores
 
 ## Requisitos
 
@@ -33,79 +37,171 @@ npm install
 npx playwright install chromium
 ```
 
-## Credenciales locales
+## Cómo se guardan las cuentas
 
-La sesión se automatiza con credenciales guardadas **solo en local**.
+La forma principal y recomendada es usar:
 
-Puedes usar una de estas dos opciones:
+- [\.accounts.local.json.example](/home/vito/repositorios/el_bruto/.accounts.local.json.example)
 
-1. Variables de entorno `ET_USERNAME` y `ET_PASSWORD`
-2. Archivo local `/.credentials.local.json`
+Copia su estructura en:
 
-Ejemplo:
+- `/.accounts.local.json`
+
+Formato:
 
 ```json
 {
-  "username": "EXAMPLE_USERNAME",
-  "password": "EXAMPLE_PASSWORD"
+  "accounts": [
+    {
+      "label": "Mi cuenta principal",
+      "username": "mi_usuario",
+      "password": "mi_password"
+    },
+    {
+      "label": "Cuenta secundaria",
+      "username": "otro_usuario",
+      "password": "otro_password"
+    }
+  ]
 }
 ```
 
-También tienes una plantilla en:
+Notas:
 
-- [\.credentials.local.json.example](/home/vito/repositorios/el_bruto/.credentials.local.json.example)
+- el archivo `/.accounts.local.json` está ignorado por git
+- el label es el nombre que verás en el modo interactivo y también el que puedes usar con `--account`
+- si solo tienes una cuenta guardada, el modo automático puede usarla sin preguntar
+- si tienes varias cuentas guardadas, en automático debes indicar cuál usar con `--account`
 
-Ese archivo local está ignorado por git y no debe subirse.
+Prioridad actual para resolver credenciales:
 
-## Uso normal
+1. `ET_USERNAME` + `ET_PASSWORD`
+2. cuenta guardada en `/.accounts.local.json`
 
-Primero compila:
+## Uso rápido
+
+Durante desarrollo puedes ejecutar directamente el código fuente:
+
+```bash
+npm run dev
+```
+
+Si prefieres usar la versión compilada:
 
 ```bash
 npm run build
+npm run start
 ```
 
-Luego ejecuta uno de estos modos.
+## Modo interactivo
 
-### Modo `single`
-
-Usa el primer bruto visible de la cuenta y pelea con él hasta que se quede sin combates o aparezca una parada segura.
+Si ejecutas sin parámetros:
 
 ```bash
-npm run start -- --mode single --debug
+npm run start
 ```
 
-### Modo `all-brutes`
+entra en modo interactivo.
 
-Procesa el roster completo avanzando con `Siguiente Bruto`.
+También puedes forzarlo con:
 
 ```bash
-npm run start -- --mode all-brutes --debug
+npm run start -- --interactive
 ```
 
-## Opciones útiles
+o:
+
+```bash
+npm run start -- --manual
+```
+
+### Qué hace el modo interactivo
+
+1. te deja elegir una cuenta guardada o introducir una nueva
+2. si introduces una nueva, te pregunta si quieres guardarla
+3. inicia sesión
+4. abre `/hall`
+5. descubre los brutos de la cuenta
+6. te deja elegir entre:
+   - todos los brutos
+   - un bruto
+   - varios brutos concretos
+
+## Modo automático
+
+El modo automático está pensado para lanzamientos no interactivos.
+
+### Ejecutar todos los brutos
+
+Con una sola cuenta guardada:
+
+```bash
+npm run start -- --mode all-brutes --headless
+```
+
+Con una cuenta concreta guardada:
+
+```bash
+npm run start -- --mode all-brutes --account "Mi cuenta principal" --headless
+```
+
+Con variables de entorno:
+
+```bash
+ET_USERNAME="mi_usuario" ET_PASSWORD="mi_password" npm run start -- --mode all-brutes --headless
+```
+
+### Ejecutar un solo bruto
+
+En automático, `single` requiere indicar el bruto:
+
+```bash
+npm run start -- --mode single --brute ExampleBrute --account "Mi cuenta principal" --headless
+```
+
+o con variables:
+
+```bash
+ET_USERNAME="mi_usuario" ET_PASSWORD="mi_password" npm run start -- --mode single --brute ExampleBrute --headless
+```
+
+## Opciones principales
 
 - `--mode single|all-brutes`
+- `--brute <nombre>`
+- `--account <label>`
+- `--interactive`
+- `--manual`
 - `--debug`
+- `--headless`
 - `--profile-dir <ruta>`
 - `--artifacts-dir <ruta>`
 - `--logs-dir <ruta>`
 - `--login-timeout-ms <ms>`
 - `--url <url>`
 
-Nota sobre `--url`:
+### Notas útiles
 
-- hoy en día el arranque real entra por la home autenticada y abre el primer bruto visible
-- `--url` sigue existiendo por compatibilidad y para construir la base del sitio, pero ya no es la forma principal de elegir el bruto en el arranque
+- `single` en automático requiere `--brute`
+- si hay varias cuentas guardadas, en automático conviene usar `--account`
+- `--debug` controla sobre todo la verbosidad en terminal
+- el archivo de log guarda detalle rico aunque no uses `--debug`
 
-## Qué verás al ejecutarlo
+## Perfiles de navegador
 
-- se abre un navegador visible
-- si hace falta, pulsa `Conectarse` / `Log in`
-- rellena usuario y contraseña
-- entra en la cuenta
-- abre el primer bruto visible
-- empieza a pelear o a recorrer el roster según el modo
+El runner usa un perfil persistente de Playwright.
+
+Si vas a alternar entre varias cuentas, es recomendable usar perfiles distintos:
+
+```bash
+npm run start -- --mode single --brute ExampleBrute --account "Mi cuenta principal" --profile-dir playwright-profile-main
+```
+
+```bash
+npm run start -- --mode single --brute ExampleBrute --account "Cuenta secundaria" --profile-dir playwright-profile-alt
+```
+
+Así evitas mezclar cookies o estado entre cuentas.
 
 ## Logs y artifacts
 
@@ -113,23 +209,35 @@ Los logs se guardan en:
 
 - `logs/`
 
-Si ocurre un error inesperado, también se guardan:
-
-- captura de pantalla
-- snapshot HTML
-
-en:
+Los artifacts de error se guardan en:
 
 - `artifacts/`
 
-## Estado actual
+Cuando algo falla, normalmente tendrás:
 
-El proyecto ya cubre el flujo práctico de uso, pero todavía hay límites:
+- un `.log`
+- una captura `.png`
+- un snapshot `.html`
 
-- algunas decisiones siguen dependiendo del HTML real que devuelva EternalTwin
+## Flujo real del runner
+
+En términos prácticos, el flujo actual es:
+
+1. abre EternalTwin
+2. inicia sesión si hace falta
+3. estabiliza la cuenta
+4. descubre brutos desde `/hall` cuando hace falta elegirlos
+5. entra al `/cell` del bruto correspondiente
+6. va a arena
+7. elige rival
+8. repite hasta descansar o terminar el modo elegido
+
+## Limitaciones conocidas
+
+- el proyecto depende del HTML real que sirva EternalTwin
 - cambios en la interfaz pueden obligar a ajustar selectores o parsers
 - la selección de rival depende de que el win-rate público se pueda resolver correctamente
-- las decisiones manuales de level-up siguen fuera de alcance
+- decisiones manuales como level-up siguen fuera de alcance
 
 ## Comandos de desarrollo
 

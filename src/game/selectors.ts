@@ -14,9 +14,32 @@ export const selectors = {
   home: {
     authenticatedMarker:
       'a[href$="/cell"], a[href*="/cell?"], button[aria-label*="brute" i], [data-testid*="brute" i]',
+    rosterMenuButton:
+      'button[aria-label*="more" i], button[aria-label*="más" i], button[aria-label*="menu" i], ' +
+      'button[title*="more" i], button[title*="más" i], button[title*="menu" i], ' +
+      'button:has(svg[data-testid="MoreVertIcon"]), button:has(svg[data-testid="MenuIcon"])',
+    rosterMenuContainer:
+      '[role="menu"], [role="dialog"], [role="presentation"] [role="menu"], .MuiMenu-paper, .MuiPopover-paper',
+    fullRosterEntries:
+      'a[href$="/cell"], a[href*="/cell?"], button[href$="/cell"], button[href*="/cell?"]',
     rosterBruteEntries:
       'main a[href$="/cell"]:has(img, svg, canvas, [role="img"], [class*="avatar" i], [class*="icon" i]), ' +
       'main a[href*="/cell?"]:has(img, svg, canvas, [role="img"], [class*="avatar" i], [class*="icon" i])',
+  },
+  hall: {
+    rosterContainer:
+      '#root .MuiPaper-root, #root [class*="MuiPaper" i], #root [class*="paper" i]',
+    rosterEntries:
+      ':scope > .MuiBox-root, :scope > [class*="box" i], :scope > div',
+    descendantRosterEntries:
+      '.MuiBox-root:has(.MuiTypography-root):has(img[alt="strength"], img[alt="agility"], img[alt="speed"], img[alt*="strength" i], img[alt*="agility" i], img[alt*="speed" i]):has([aria-label*="combates" i], [aria-label*="fights" i], [aria-label*="quedan" i]), ' +
+      '[class*="box" i]:has([class*="MuiTypography-root" i], [class*="typography" i]):has(img[alt="strength"], img[alt="agility"], img[alt="speed"], img[alt*="strength" i], img[alt*="agility" i], img[alt*="speed" i]):has([aria-label*="combates" i], [aria-label*="fights" i], [aria-label*="quedan" i])',
+    entryName:
+      '.MuiTypography-root, [class*="MuiTypography-root" i], [class*="typography" i]',
+    entryStatIcons:
+      'img[alt="strength"], img[alt="agility"], img[alt="speed"], img[alt*="strength" i], img[alt*="agility" i], img[alt*="speed" i]',
+    entryFightAvailability:
+      '[aria-label*="combates" i], [aria-label*="fights" i], [aria-label*="quedan" i]',
   },
   cell: {
     arenaLink: 'a[href$="/arena"]',

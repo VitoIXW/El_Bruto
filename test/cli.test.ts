@@ -7,25 +7,40 @@ import { selectors } from '../src/game/selectors';
 
 test('parseCliArgs uses defaults', () => {
   const options = parseCliArgs([]);
-  assert.equal(options.url, 'https://brute.eternaltwin.org/ExampleBrute/cell');
+  assert.equal(options.runStyle, 'interactive');
   assert.equal(options.mode, 'single');
   assert.equal(options.debug, false);
+  assert.equal(options.headless, false);
 });
 
 test('parseCliArgs reads supported flags', () => {
   const options = parseCliArgs([
+    '--account',
+    'Example Account',
+    '--brute',
+    'TargetBrute',
     '--mode',
     'all-brutes',
     '--url',
     'https://brute.eternaltwin.org/ExampleBrute/cell',
     '--debug',
+    '--headless',
     '--login-timeout-ms',
     '5000',
   ]);
 
+  assert.equal(options.account, 'Example Account');
+  assert.equal(options.brute, 'TargetBrute');
   assert.equal(options.mode, 'all-brutes');
   assert.equal(options.debug, true);
+  assert.equal(options.headless, true);
   assert.equal(options.loginTimeoutMs, 5000);
+});
+
+test('parseCliArgs enables interactive mode explicitly', () => {
+  const options = parseCliArgs(['--interactive']);
+
+  assert.equal(options.runStyle, 'interactive');
 });
 
 test('package start script points at the compiled CLI entrypoint', () => {

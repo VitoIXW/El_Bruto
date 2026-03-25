@@ -1,12 +1,11 @@
 import type { CliOptions } from './types/run-types';
 
-const DEFAULT_URL = 'https://brute.eternaltwin.org/ExampleBrute/cell';
-
 export function parseCliArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
-    url: DEFAULT_URL,
+    runStyle: argv.length === 0 ? 'interactive' : 'automatic',
     mode: 'single',
     debug: false,
+    headless: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -14,6 +13,10 @@ export function parseCliArgs(argv: string[]): CliOptions {
     const next = argv[index + 1];
 
     switch (arg) {
+      case '--interactive':
+      case '--manual':
+        options.runStyle = 'interactive';
+        break;
       case '--url':
         if (!next) {
           throw new Error('Missing value for --url');
@@ -21,8 +24,25 @@ export function parseCliArgs(argv: string[]): CliOptions {
         options.url = next;
         index += 1;
         break;
+      case '--brute':
+        if (!next) {
+          throw new Error('Missing value for --brute');
+        }
+        options.brute = next;
+        index += 1;
+        break;
+      case '--account':
+        if (!next) {
+          throw new Error('Missing value for --account');
+        }
+        options.account = next;
+        index += 1;
+        break;
       case '--debug':
         options.debug = true;
+        break;
+      case '--headless':
+        options.headless = true;
         break;
       case '--mode':
         if (!next) {

@@ -19,11 +19,16 @@ export type FinalStatus =
   | 'error';
 
 export type ExecutionMode = 'single' | 'all-brutes';
+export type RunStyle = 'automatic' | 'interactive';
 
 export interface CliOptions {
-  url: string;
+  runStyle: RunStyle;
+  url?: string;
   mode: ExecutionMode;
+  brute?: string;
+  account?: string;
   debug: boolean;
+  headless: boolean;
   profileDir?: string;
   artifactsDir?: string;
   logsDir?: string;
@@ -32,22 +37,31 @@ export interface CliOptions {
 
 export interface RunConfig {
   targetUrl: string;
+  targetBruteName?: string;
+  accountLabel?: string;
   bootstrapUrl: string;
   executionMode: ExecutionMode;
   profileDir: string;
   artifactsDir: string;
   logsDir: string;
-  headless: false;
+  headless: boolean;
   debug: boolean;
   loginTimeoutMs: number;
   stepTimeoutMs: number;
   maxActionRetries: number;
+  loginCredentials?: LoginCredentials;
 }
 
 export interface LoginCredentials {
   username: string;
   password: string;
-  source: 'environment' | 'file';
+  source: 'environment' | 'saved-account' | 'interactive';
+}
+
+export interface SavedAccount {
+  label: string;
+  username: string;
+  password: string;
 }
 
 export interface StateDetectionDetails {
