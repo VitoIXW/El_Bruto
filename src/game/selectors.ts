@@ -9,6 +9,8 @@ export const selectors = {
   },
   cell: {
     arenaLink: 'a[href$="/arena"]',
+    nextBruteControl:
+      'a:has-text("Next Brute"), button:has-text("Next Brute"), a:has-text("Siguiente Bruto"), button:has-text("Siguiente Bruto"), a[aria-label="Next Brute"], button[aria-label="Next Brute"], a[aria-label="Siguiente Bruto"], button[aria-label="Siguiente Bruto"]',
     restingText:
       'text=/rest(ing|ed)|come back later|no more fights|is resting|new fights (will be )?available tomorrow|est[aá] descansando|nuevos combates estar[aá]n disponibles ma[nñ]ana/i',
     bruteNameHeading: 'h1, h2, [data-testid="brute-name"]',
@@ -33,12 +35,16 @@ export const selectors = {
   },
   levelUp: {
     levelUpHeading: 'text=/level up|sube de nivel/i',
-    levelUpChoiceText: 'text=/choose|skill|weapon|pet|sacrificar|reiniciar|subir de rango/i',
+    levelUpChoiceText: 'text=/choose|skill|weapon|pet/i',
   },
 };
 
 export function buildCellHrefPattern(bruteName: string): string {
   return `/${encodeURIComponent(bruteName)}/cell`;
+}
+
+export function buildCellUrl(origin: string, bruteName: string): string {
+  return `${origin}/${encodeURIComponent(bruteName)}/cell`;
 }
 
 export function normalizeText(value: string | null | undefined): string {

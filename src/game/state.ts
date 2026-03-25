@@ -37,7 +37,7 @@ export function classifyState(signals: StateSignals): StateDetectionDetails {
   ) {
     state = 'login_required';
     notes.push('login markers detected');
-  } else if (signals.hasLevelUpHeading && signals.hasLevelUpChoiceText) {
+  } else if (signals.hasLevelUpHeading) {
     state = 'level_up';
     notes.push('level-up markers detected');
   } else if (signals.url.includes('/fight/') && signals.hasFightReturnLinks) {

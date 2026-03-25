@@ -8,50 +8,7 @@ import { launchFightFromPreFight, selectOpponent } from './arena';
 import { detectState } from './detector';
 import { clickArena, clickReturnToCurrentCell, waitForUrlSuffix } from './navigation';
 import { canRetryFromState } from './retry';
-import { extractTargetBruteName, isTargetBruteLoaded, isTransientState } from './target-resolution';
-
-type StableStatePhase = 'login' | 'post_login';
-
-async function waitForStableGameState(
-  page: Page,
-  logger: Logger,
-  timeoutMs: number,
-  phase: StableStatePhase,
-): Promise<Awaited<ReturnType<typeof detectState>>> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const state = await detectState(page, logger);
-    if (!isTransientState(state.state)) {
-      return state;
-    }
-    await page.waitForTimeout(1000);
-  }
-
-  throw new Error(`Stable game state timeout [phase=${phase}] reached after ${timeoutMs}ms.`);
-}
-
-async function resolveTargetBruteAfterLogin(
-  page: Page,
-  config: RunConfig,
-  logger: Logger,
-  initialState: StateDetectionDetails,
-): Promise<StateDetectionDetails> {
-  const targetBruteName = extractTargetBruteName(config.targetUrl);
-  let state = initialState;
-
-  if (isTransientState(state.state)) {
-    state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login');
-  }
-
-  if (isTargetBruteLoaded(targetBruteName, state)) {
-    logger.info(`Target brute ${targetBruteName} is already loaded. Skipping redundant navigation.`);
-    return state;
-  }
-
-  logger.info(`Navigating to target brute ${config.targetUrl}`);
-  await page.goto(config.targetUrl, { waitUntil: 'domcontentloaded' });
-  return waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login');
-}
+import { bootstrapIntoTargetBrute, waitForStableGameState } from './startup';
 
 async function executeStateSafeAction(
   page: Page,
@@ -86,6 +43,16 @@ async function executeStateSafeAction(
 }
 
 export async function runBrute(page: Page, config: RunConfig, logger: Logger): Promise<RunSummary> {
+  const state = await bootstrapIntoTargetBrute(page, config, logger);
+  return runCurrentBrute(page, config, logger, state);
+}
+
+export async function runCurrentBrute(
+  page: Page,
+  config: RunConfig,
+  logger: Logger,
+  initialState: StateDetectionDetails,
+): Promise<RunSummary> {
   let bruteName = 'unknown';
   let fightsCompleted = 0;
   let restingReached = false;
@@ -95,16 +62,7 @@ export async function runBrute(page: Page, config: RunConfig, logger: Logger): P
   let artifacts: FailureArtifacts | undefined;
 
   try {
-    logger.info(`Opening bootstrap entrypoint ${config.bootstrapUrl}`);
-    await page.goto(config.bootstrapUrl, { waitUntil: 'domcontentloaded' });
-    let state: StateDetectionDetails = await detectState(page, logger);
-
-    if (state.state === 'login_required') {
-      logger.info(`Login required. Complete login in the browser window within ${config.loginTimeoutMs}ms.`);
-      state = await waitForStableGameState(page, logger, config.loginTimeoutMs, 'login');
-    }
-
-    state = await resolveTargetBruteAfterLogin(page, config, logger, state);
+    let state: StateDetectionDetails = initialState;
     bruteName = state.bruteNameFromPage ?? bruteName;
 
     while (true) {
