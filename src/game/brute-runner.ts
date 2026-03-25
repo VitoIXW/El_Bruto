@@ -115,7 +115,7 @@ export async function runCurrentBrute(
           break;
         case 'arena_selection':
           await executeStateSafeAction(page, 'arena_selection', async () => {
-            await selectOpponent(page, config.stepTimeoutMs);
+            await selectOpponent(page, config.stepTimeoutMs, logger);
           }, config.maxActionRetries, logger, 'Select arena opponent');
           break;
         case 'pre_fight':

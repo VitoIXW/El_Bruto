@@ -9,6 +9,27 @@ import { isTransientState } from './target-resolution';
 
 export type StableStatePhase = 'login' | 'post_login';
 
+function isActionablePostSubmitState(state: StateDetectionDetails): boolean {
+  return state.state !== 'login_form' && !isTransientState(state.state, 'login');
+}
+
+export async function waitForLoginSubmitTransition(
+  page: Page,
+  logger: Logger,
+  timeoutMs: number,
+): Promise<StateDetectionDetails> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const state = await detectState(page, logger);
+    if (isActionablePostSubmitState(state)) {
+      return state;
+    }
+    await page.waitForTimeout(1000);
+  }
+
+  throw new Error(`Login submit transition timeout waiting for an actionable state after ${timeoutMs}ms.`);
+}
+
 export async function waitForStableGameState(
   page: Page,
   logger: Logger,
@@ -47,7 +68,7 @@ export async function bootstrapIntoTargetBrute(
         const credentials = loadLoginCredentials();
         logger.info(`Login form detected. Submitting credentials from ${credentials.source}.`);
         await submitLoginForm(page, credentials.username, credentials.password);
-        state = await waitForStableGameState(page, logger, config.loginTimeoutMs, 'login');
+        state = await waitForLoginSubmitTransition(page, logger, config.loginTimeoutMs);
         continue;
       }
       case 'authenticated_home':

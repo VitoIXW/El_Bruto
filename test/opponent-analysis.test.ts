@@ -29,6 +29,16 @@ test('extractWinRatePercentage parses English public cell markup', () => {
   assert.equal(extractWinRatePercentage(html), 18);
 });
 
+test('extractWinRatePercentage parses public brute JSON payload victories and losses', () => {
+  const payload = JSON.stringify({
+    name: 'OpponentBrute',
+    victories: 45,
+    losses: 55,
+  });
+
+  assert.equal(extractWinRatePercentage(payload), 45);
+});
+
 test('extractWinRatePercentage is deterministic across repeated sequential calls', () => {
   const spanishHtml = `
     <section>
@@ -101,6 +111,63 @@ test('analyzePublicOpponentWinRates keeps successful and failed public analyses 
     analyses.find((analysis) => analysis.name === 'OpponentBrute')?.error ?? '',
     /404/,
   );
+});
+
+test('analyzePublicOpponentWinRates falls back from SPA shell HTML to public brute JSON data', async () => {
+  const fetchCalls: string[] = [];
+  const apiHeaders: Array<Record<string, string>> = [];
+  const analyses = await analyzePublicOpponentWinRates(
+    'https://brute.eternaltwin.org',
+    ['ExampleBrute', 'TargetBrute'],
+    async (input, init) => {
+      const url = String(input);
+      fetchCalls.push(url);
+
+      if (url.endsWith('/api/csrf')) {
+        return new Response(JSON.stringify({ csrfToken: 'csrf-token' }), {
+          status: 200,
+          headers: {
+            'set-cookie': 'csrfToken=csrf-token; Path=/; HttpOnly',
+          },
+        });
+      }
+
+      if (url.endsWith('/ExampleBrute/cell') || url.endsWith('/TargetBrute/cell')) {
+        return new Response(
+          '<!doctype html><html><body><div id="root"></div><script src="/static/js/main.js"></script></body></html>',
+          { status: 200 },
+        );
+      }
+
+      if (url.endsWith('/api/brute/ExampleBrute/for-hook')) {
+        apiHeaders.push(init?.headers as Record<string, string>);
+        return new Response(JSON.stringify({ victories: 54, losses: 46 }), { status: 200 });
+      }
+
+      if (url.endsWith('/api/brute/TargetBrute/for-hook')) {
+        apiHeaders.push(init?.headers as Record<string, string>);
+        return new Response(JSON.stringify({ victories: 12, losses: 88 }), { status: 200 });
+      }
+
+      return new Response('not found', { status: 404 });
+    },
+  );
+
+  assert.equal(fetchCalls.filter((url) => url.endsWith('/api/csrf')).length, 1);
+  assert.equal(analyses.find((analysis) => analysis.name === 'ExampleBrute')?.winRatePercentage, 54);
+  assert.equal(analyses.find((analysis) => analysis.name === 'TargetBrute')?.winRatePercentage, 12);
+  assert.deepEqual(apiHeaders, [
+    {
+      accept: 'application/json',
+      cookie: 'csrfToken=csrf-token',
+      'x-csrf-token': 'csrf-token',
+    },
+    {
+      accept: 'application/json',
+      cookie: 'csrfToken=csrf-token',
+      'x-csrf-token': 'csrf-token',
+    },
+  ]);
 });
 
 test('analyzePublicOpponentWinRates keeps ranking inputs stable across sequential runs', async () => {

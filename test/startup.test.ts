@@ -65,8 +65,40 @@ test('waitForStableGameState returns login_form during login bootstrap', { concu
   }
 });
 
+test('waitForLoginSubmitTransition ignores transient post-submit states until login reaches an actionable state', { concurrency: false }, async () => {
+  const originalDetectState = detector.detectState;
+  const page = {
+    waitForTimeoutCalls: [] as number[],
+    async waitForTimeout(timeoutMs: number) {
+      this.waitForTimeoutCalls.push(timeoutMs);
+    },
+  };
+  const states: StateDetectionDetails[] = [
+    { state: 'login_form', url: 'https://brute.eternaltwin.org/login', notes: [] },
+    { state: 'public_home', url: 'https://brute.eternaltwin.org', notes: [] },
+    { state: 'unknown', url: 'https://brute.eternaltwin.org/loading', notes: [] },
+    { state: 'authenticated_home', url: 'https://brute.eternaltwin.org/home', notes: [] },
+  ];
+
+  detector.detectState = async () => {
+    const nextState = states.shift();
+    if (!nextState) {
+      throw new Error('No more states configured for detectState.');
+    }
+    return nextState;
+  };
+
+  try {
+    const result = await startup.waitForLoginSubmitTransition(page as never, createLogger(), 5000);
+    assert.equal(result.state, 'authenticated_home');
+    assert.deepEqual(page.waitForTimeoutCalls, [1000, 1000, 1000]);
+  } finally {
+    detector.detectState = originalDetectState;
+  }
+});
+
 test(
-  'bootstrapIntoTargetBrute submits credentials after the login form becomes actionable',
+  'bootstrapIntoTargetBrute does not re-submit credentials while the first login submit is resolving',
   { concurrency: false },
   async () => {
   const originalDetectState = detector.detectState;
@@ -90,7 +122,9 @@ test(
     { state: 'public_home', url: 'https://brute.eternaltwin.org', notes: [] },
     { state: 'public_home', url: 'https://brute.eternaltwin.org', notes: [] },
     { state: 'login_form', url: 'https://brute.eternaltwin.org/login', notes: [] },
-    { state: 'login_required', url: 'https://brute.eternaltwin.org/login', notes: [] },
+    { state: 'login_form', url: 'https://brute.eternaltwin.org/login', notes: [] },
+    { state: 'public_home', url: 'https://brute.eternaltwin.org', notes: [] },
+    { state: 'unknown', url: 'https://brute.eternaltwin.org/loading', notes: [] },
     { state: 'authenticated_home', url: 'https://brute.eternaltwin.org/home', notes: [] },
     {
       state: 'cell_ready',
@@ -133,7 +167,7 @@ test(
       'clickFirstHomeBrute',
     ]);
     assert.deepEqual(page.visitedUrls, ['https://brute.eternaltwin.org']);
-    assert.deepEqual(page.waitForTimeoutCalls, [1000, 1000]);
+    assert.deepEqual(page.waitForTimeoutCalls, [1000, 1000, 1000, 1000]);
   } finally {
     detector.detectState = originalDetectState;
     navigation.clickPublicLogin = originalClickPublicLogin;
