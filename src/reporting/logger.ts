@@ -17,10 +17,10 @@ export function createLogger(logsDir: string, debugEnabled: boolean): Logger {
   fs.mkdirSync(logsDir, { recursive: true });
   const logFilePath = path.join(logsDir, `${timestamp().replace(/[:.]/g, '-')}-run.log`);
 
-  const write = (level: string, message: string, alwaysPrint = true): void => {
+  const write = (level: string, message: string, printToConsole = true): void => {
     const line = `[${timestamp()}] [${level}] ${message}`;
     fs.appendFileSync(logFilePath, `${line}\n`, 'utf8');
-    if (alwaysPrint) {
+    if (printToConsole) {
       console.log(line);
     }
   };
@@ -36,9 +36,7 @@ export function createLogger(logsDir: string, debugEnabled: boolean): Logger {
       write('ERROR', message);
     },
     debug(message) {
-      if (debugEnabled) {
-        write('DEBUG', message);
-      }
+      write('DEBUG', message, debugEnabled);
     },
     logFilePath,
   };
