@@ -18,6 +18,7 @@ export async function detectState(page: Page, logger?: Logger): Promise<StateDet
     hasPublicLoginButton: (await locatorCount(page, selectors.login.loginButton)) > 0,
     hasSearchBruteInput: (await locatorCount(page, selectors.login.searchBruteInput)) > 0,
     hasPublicBruteNotFoundText: (await locatorCount(page, selectors.login.bruteNotFoundText)) > 0,
+    hasAuthenticatedHomeMarker: (await locatorCount(page, selectors.home.authenticatedMarker)) > 0,
     hasUnknownBruteUrl: page.url().includes('unknown-brute'),
     hasArenaLink: (await locatorCount(page, selectors.cell.arenaLink)) > 0,
     hasArenaWelcomeText: (await locatorCount(page, selectors.arena.welcomeText)) > 0,
