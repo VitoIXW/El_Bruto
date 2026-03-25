@@ -9,7 +9,12 @@ import { runAllBrutes } from './game/account-runner';
 import { runBrute, runCurrentBrute } from './game/brute-runner';
 import { listHallRosterBrutes } from './game/navigation';
 import { bootstrapToAuthenticatedHome, continueToConfiguredBrute } from './game/startup';
-import { createConsolePrompter, promptForAccountSelection, promptForRunSelection } from './ui/interactive';
+import {
+  createConsolePrompter,
+  promptForAccountSelection,
+  promptForRunSelection,
+  writeInteractiveHeader,
+} from './ui/interactive';
 import type { RunConfig, RunSummary } from './types/run-types';
 
 function buildBruteRunConfig(baseConfig: RunConfig, bruteName: string): RunConfig {
@@ -34,6 +39,7 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
   });
   try {
     prompter.clearScreen?.();
+    writeInteractiveHeader(prompter);
     const savedAccounts = loadSavedAccounts();
     const accountChoice = await promptForAccountSelection(savedAccounts, prompter);
     prompter.clearScreen?.();

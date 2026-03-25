@@ -5,6 +5,7 @@ import {
   parseMultiSelection,
   promptForAccountSelection,
   promptForRunSelection,
+  writeInteractiveHeader,
   type InteractivePrompter,
 } from '../src/ui/interactive';
 
@@ -204,4 +205,14 @@ test('parseMultiSelection keeps valid unique brute selections in input order', (
     parseMultiSelection('3, 1, 3, 9', ['ExampleBrute', 'TargetBrute', 'OpponentBrute']),
     ['OpponentBrute', 'ExampleBrute'],
   );
+});
+
+test('writeInteractiveHeader prints the EL BRUTO banner', () => {
+  const { prompter, writes } = createPrompter([]);
+
+  writeInteractiveHeader(prompter);
+
+  assert.equal(writes.length, 7);
+  assert.match(writes[0] ?? '', /███████╗██╗/);
+  assert.equal(writes[6], '');
 });

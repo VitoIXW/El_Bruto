@@ -24,6 +24,15 @@ export interface InteractiveRunSelection {
   bruteNames: string[];
 }
 
+const INTERACTIVE_HEADER_LINES = [
+  '███████╗██╗         ██████╗ ██████╗ ██╗   ██╗████████╗ ██████╗ ',
+  '██╔════╝██║         ██╔══██╗██╔══██╗██║   ██║╚══██╔══╝██╔═══██╗',
+  '█████╗  ██║         ██████╔╝██████╔╝██║   ██║   ██║   ██║   ██║',
+  '██╔══╝  ██║         ██╔══██╗██╔══██╗██║   ██║   ██║   ██║   ██║',
+  '███████╗███████╗    ██████╔╝██║  ██║╚██████╔╝   ██║   ╚██████╔╝',
+  '╚══════╝╚══════╝    ╚═════╝ ╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝ ',
+];
+
 interface TtyLikeInput extends Readable {
   isTTY?: boolean;
   setRawMode?(mode: boolean): void;
@@ -55,6 +64,13 @@ export function parseMultiSelection(input: string, availableItems: string[]): st
     .filter((value): value is number => value !== undefined);
 
   return Array.from(new Set(selectedIndexes)).map((index) => availableItems[index]);
+}
+
+export function writeInteractiveHeader(prompter: InteractivePrompter): void {
+  INTERACTIVE_HEADER_LINES.forEach((line) => {
+    prompter.write(line);
+  });
+  prompter.write('');
 }
 
 export function createConsolePrompter(
