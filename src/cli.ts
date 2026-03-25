@@ -5,6 +5,7 @@ const DEFAULT_URL = 'https://brute.eternaltwin.org/ExampleBrute/cell';
 export function parseCliArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
     url: DEFAULT_URL,
+    mode: 'single',
     debug: false,
   };
 
@@ -22,6 +23,16 @@ export function parseCliArgs(argv: string[]): CliOptions {
         break;
       case '--debug':
         options.debug = true;
+        break;
+      case '--mode':
+        if (!next) {
+          throw new Error('Missing value for --mode');
+        }
+        if (next !== 'single' && next !== 'all-brutes') {
+          throw new Error('Invalid value for --mode. Expected "single" or "all-brutes".');
+        }
+        options.mode = next;
+        index += 1;
         break;
       case '--profile-dir':
         if (!next) {
