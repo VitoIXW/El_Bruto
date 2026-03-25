@@ -24,6 +24,7 @@ test('createLogger always writes debug lines to the file while keeping console q
     assert.match(logContent, /\[INFO\] info detail/);
     assert.equal(consoleLines.some((line) => line.includes('debug detail')), false);
     assert.equal(consoleLines.some((line) => line.includes('info detail')), true);
+    assert.equal(typeof logger.supportsColor, 'boolean');
   } finally {
     console.log = originalConsoleLog;
     fs.rmSync(tempDir, { recursive: true, force: true });

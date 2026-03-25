@@ -183,7 +183,7 @@ export async function runCurrentBrute(
       levelUpDetected,
       errorsOccurred,
       artifacts,
-    }));
+    }, { color: logger.supportsColor }));
 
     return {
       bruteName,

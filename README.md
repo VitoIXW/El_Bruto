@@ -41,10 +41,6 @@ npx playwright install chromium
 
 La forma principal y recomendada es usar:
 
-- [\.accounts.local.json.example](/home/vito/repositorios/el_bruto/.accounts.local.json.example)
-
-Copia su estructura en:
-
 - `/.accounts.local.json`
 
 Formato:

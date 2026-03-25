@@ -17,7 +17,8 @@ test('formatSummary includes artifact paths when present', () => {
     },
   });
 
-  assert.match(text, /Brute name: ExampleBrute/);
+  assert.match(text, /Brute: ExampleBrute/);
+  assert.match(text, /Status: resting/);
   assert.match(text, /Screenshot: artifacts\/example\.png/);
   assert.match(text, /HTML snapshot: artifacts\/example\.html/);
 });
@@ -32,8 +33,8 @@ test('formatSummary makes level-up manual intervention explicit', () => {
     errorsOccurred: false,
   });
 
-  assert.match(text, /Final status: manual_intervention_required/);
-  assert.match(text, /Level-up detected: true/);
+  assert.match(text, /Status: manual intervention required/);
+  assert.match(text, /Level-up: yes/);
   assert.match(
     text,
     /Reason: The brute leveled up and requires a manual upgrade choice before continuing\./,
@@ -71,13 +72,13 @@ test('formatAccountSummary includes aggregate counts and per-brute results', () 
     ],
   });
 
-  assert.match(text, /Account run summary/);
+  assert.match(text, /Account Run Summary/);
+  assert.match(text, /Outcome: COMPLETE/);
   assert.match(text, /Brutes processed: 2/);
-  assert.match(text, /Advance failed: false/);
-  assert.match(text, /Total fights completed: 5/);
-  assert.match(text, /Manual intervention required: 1/);
-  assert.match(text, /- ExampleBrute \| fights=3 \| status=resting/);
-  assert.match(text, /- TargetBrute \| fights=2 \| status=manual_intervention_required/);
+  assert.match(text, /Total fights: 5/);
+  assert.match(text, /Manual intervention: 1/);
+  assert.match(text, /- ExampleBrute \| status=resting \| fights=3/);
+  assert.match(text, /- TargetBrute \| status=manual intervention required \| fights=2/);
 });
 
 test('formatAccountSummary makes incomplete-cycle advance failure explicit', () => {
@@ -104,7 +105,6 @@ test('formatAccountSummary makes incomplete-cycle advance failure explicit', () 
     ],
   });
 
-  assert.match(text, /Cycle completed: false/);
-  assert.match(text, /Advance failed: true/);
+  assert.match(text, /Outcome: INCOMPLETE/);
   assert.match(text, /Failure reason: Unable to advance to the next brute after ExampleBrute: missing next-brute control/);
 });

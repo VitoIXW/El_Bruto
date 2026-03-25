@@ -9,7 +9,12 @@ import { runAllBrutes } from './game/account-runner';
 import { runBrute, runCurrentBrute } from './game/brute-runner';
 import { listHallRosterBrutes } from './game/navigation';
 import { bootstrapToAuthenticatedHome, continueToConfiguredBrute } from './game/startup';
-import { createConsolePrompter, promptForAccountSelection, promptForRunSelection } from './ui/interactive';
+import {
+  createConsolePrompter,
+  promptForAccountSelection,
+  promptForRunSelection,
+  writeInteractiveHeader,
+} from './ui/interactive';
 import type { RunConfig, RunSummary } from './types/run-types';
 
 function buildBruteRunConfig(baseConfig: RunConfig, bruteName: string): RunConfig {
@@ -29,10 +34,15 @@ function buildAllBrutesRunConfig(baseConfig: RunConfig, bruteName: string): RunC
 }
 
 async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<typeof createLogger>): Promise<void> {
-  const prompter = createConsolePrompter();
+  const prompter = createConsolePrompter(process.stdin, process.stdout, {
+    allowScreenClears: !baseConfig.debug,
+  });
   try {
+    prompter.clearScreen?.();
+    writeInteractiveHeader(prompter);
     const savedAccounts = loadSavedAccounts();
     const accountChoice = await promptForAccountSelection(savedAccounts, prompter);
+    prompter.clearScreen?.();
 
     if (accountChoice.accountToSave) {
       saveAccount(accountChoice.accountToSave);
@@ -53,6 +63,7 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
       logger.info('Authenticated home detected. Opening /hall to discover account brutes.');
       const bruteNames = await listHallRosterBrutes(page, interactiveConfig.bootstrapUrl, logger);
       const selection = await promptForRunSelection(bruteNames, prompter);
+      prompter.clearScreen?.();
 
       if (selection.executionMode === 'all-brutes') {
         const firstBruteName = selection.bruteNames[0];
@@ -60,7 +71,7 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
         logger.info(`Continuing interactive all-brutes cycle directly from ${allBrutesConfig.targetUrl}.`);
         const state = await continueToConfiguredBrute(page, allBrutesConfig, logger);
         const summary = await runAllBrutes(page, allBrutesConfig, logger, state, selection.bruteNames);
-        logger.info(formatAccountSummary(summary));
+        logger.info(formatAccountSummary(summary, { color: logger.supportsColor }));
         process.exitCode = accountRunHasFailure(summary) ? 1 : 0;
         return;
       }
@@ -72,7 +83,7 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
         const state = await continueToConfiguredBrute(page, bruteConfig, logger);
         const summary = await runCurrentBrute(page, bruteConfig, logger, state);
         summaries.push(summary);
-        logger.info(formatSummary(summary));
+        logger.info(formatSummary(summary, { color: logger.supportsColor }));
       }
 
       process.exitCode = summaries.some((summary) => summary.errorsOccurred) ? 1 : 0;
@@ -100,13 +111,13 @@ async function main(): Promise<void> {
   try {
     if (config.executionMode === 'all-brutes') {
       const summary = await runAllBrutes(page, config, logger);
-      logger.info(formatAccountSummary(summary));
+      logger.info(formatAccountSummary(summary, { color: logger.supportsColor }));
       process.exitCode = accountRunHasFailure(summary) ? 1 : 0;
       return;
     }
 
     const summary = await runBrute(page, config, logger);
-    logger.info(formatSummary(summary));
+    logger.info(formatSummary(summary, { color: logger.supportsColor }));
     process.exitCode = summary.errorsOccurred ? 1 : 0;
   } finally {
     await context.close();

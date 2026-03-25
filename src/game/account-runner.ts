@@ -217,7 +217,7 @@ export async function runAllBrutes(
 
     bruteResults.push(bruteSummary);
     visitedBrutes.add(bruteSummary.bruteName);
-    logger.info(formatSummary(bruteSummary));
+    logger.info(formatSummary(bruteSummary, { color: logger.supportsColor }));
 
     try {
       const nextState = await moveToNextBrute(page, config, logger, bruteSummary.bruteName, bruteOrder);
