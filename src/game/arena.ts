@@ -1,7 +1,8 @@
 import type { Page } from 'playwright';
 
+import { analyzePublicOpponentWinRates, chooseLowestWinRateOpponent } from './opponent-analysis';
 import { selectors } from './selectors';
-import { chooseFirstOpponent, startFight } from './navigation';
+import { chooseFirstOpponent, chooseNamedOpponent, readVisibleArenaOpponents, startFight } from './navigation';
 
 export interface ArenaReadinessSignals {
   hasWelcomeText: boolean;
@@ -71,6 +72,21 @@ export async function waitForArenaReady(page: Page, timeoutMs: number): Promise<
 
 export async function selectOpponent(page: Page, timeoutMs: number): Promise<void> {
   await waitForArenaReady(page, timeoutMs);
+  const visibleOpponents = await readVisibleArenaOpponents(page);
+  const namedOpponents = visibleOpponents
+    .map((opponent) => opponent.name)
+    .filter((name): name is string => Boolean(name));
+
+  if (namedOpponents.length > 0) {
+    const analyses = await analyzePublicOpponentWinRates(new URL(page.url()).origin, namedOpponents);
+    const preferredOpponent = chooseLowestWinRateOpponent(analyses);
+
+    if (preferredOpponent && await chooseNamedOpponent(page, preferredOpponent.name)) {
+      await page.waitForURL((url) => !url.pathname.endsWith('/arena'), { timeout: timeoutMs });
+      return;
+    }
+  }
+
   await chooseFirstOpponent(page);
   await page.waitForURL((url) => !url.pathname.endsWith('/arena'), { timeout: timeoutMs });
 }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { extractBruteNameFromUrl } from '../src/game/navigation';
+import { extractArenaOpponentName, extractBruteNameFromUrl } from '../src/game/navigation';
 
 test('extractBruteNameFromUrl resolves brute identity from a special cell route', () => {
   assert.equal(
@@ -17,6 +17,17 @@ test('extractBruteNameFromUrl resolves brute identity from arena and versus rout
   );
   assert.equal(
     extractBruteNameFromUrl('https://brute.eternaltwin.org/TargetBrute/versus/OpponentBrute'),
+    'TargetBrute',
+  );
+});
+
+test('extractArenaOpponentName skips generic arena labels and keeps the visible rival name', () => {
+  assert.equal(
+    extractArenaOpponentName('Fight\nOpponentBrute\n62%'),
+    'OpponentBrute',
+  );
+  assert.equal(
+    extractArenaOpponentName('Comenzar el combate\nTargetBrute\nRatio de Victoria 41%'),
     'TargetBrute',
   );
 });
