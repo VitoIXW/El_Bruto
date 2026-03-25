@@ -1,13 +1,16 @@
 # El Bruto Arena Runner
 
-A TypeScript + Playwright CLI that automates arena fights for a single EternalTwin La Brute character.
+A TypeScript + Playwright CLI that automates EternalTwin La Brute arena fights in two modes:
+
+- `single`: run one target brute
+- `all-brutes`: iterate through the account roster with `Next Brute` / `Siguiente Bruto`
 
 It is designed to be:
 
 - robust against transient page states
 - easy to debug
 - safe to run manually on demand
-- extensible for future multi-brute support
+- usable for both one-brute and roster-wide manual runs
 
 ## What It Does
 
@@ -18,13 +21,17 @@ Given a target brute cell URL, the tool:
 3. Waits for you to log in manually if needed.
 4. Navigates to the target brute.
 5. Detects the current page state.
-6. Repeats the arena flow until the brute is resting or a terminal condition is reached.
+6. Runs either:
+   - a single-brute fight loop
+   - or an all-brutes roster loop that advances with `Next Brute`
 
 The current Phase A flow supports:
 
 - login bootstrap from the site root
 - session reuse through a persistent browser profile
 - target brute resolution after login
+- single-brute execution
+- all-brutes execution by traversing the roster cyclically
 - arena entry
 - rival selection
 - pre-fight detection on `/versus/...`
@@ -35,11 +42,13 @@ The current Phase A flow supports:
 
 ## Current Scope
 
-This version processes only the currently requested brute.
+This version can:
+
+- process a single requested brute
+- process all brutes reachable through the in-game `Next Brute` / `Siguiente Bruto` control
 
 It does **not** yet:
 
-- process all brutes in an account
 - choose rivals strategically
 - automate level-up choice decisions
 - schedule runs automatically
@@ -71,9 +80,16 @@ Example:
 npm run start -- --url "https://brute.eternaltwin.org/ExampleBrute/cell" --debug
 ```
 
+All brutes mode:
+
+```bash
+npm run start -- --mode all-brutes --url "https://brute.eternaltwin.org/ExampleBrute/cell" --debug
+```
+
 ### Supported CLI options
 
 - `--url <target-cell-url>`
+- `--mode <single|all-brutes>`
 - `--debug`
 - `--profile-dir <path>`
 - `--artifacts-dir <path>`
@@ -86,7 +102,8 @@ npm run start -- --url "https://brute.eternaltwin.org/ExampleBrute/cell" --debug
 2. A visible browser opens.
 3. If you are logged out, the tool waits for you to log in manually.
 4. After login stabilizes, the tool moves to the target brute.
-5. It attacks until the brute is resting or another terminal state is reached.
+5. In `single` mode, it attacks until the brute is resting or another terminal state is reached.
+6. In `all-brutes` mode, it processes the current brute, advances to the next brute, and stops when the roster cycle closes or a safe stop condition is reached.
 
 ### Typical later runs
 
@@ -115,6 +132,7 @@ The runner intentionally tolerates short-lived transient states, especially afte
 - SPA hydration
 - moving from arena to versus
 - returning from fight to cell
+- switching between brutes in roster mode
 
 This is why logs may briefly show `unknown` before stabilizing to a known state.
 
@@ -149,6 +167,16 @@ At the end of a run, the tool prints a summary including:
 - whether errors occurred
 - artifact paths if applicable
 
+In `all-brutes` mode, it also prints an account summary including:
+
+- started brute
+- whether the roster cycle completed
+- whether advancing to the next brute failed
+- total brutes processed
+- total fights completed
+- counts for resting, manual intervention, and errors
+- per-brute results
+
 ## Language Support
 
 The current implementation is intended to work with both:
@@ -181,6 +209,8 @@ Main modules:
   - persistent Playwright session bootstrapping
 - `src/game/brute-runner.ts`
   - main orchestration/state-machine loop
+- `src/game/account-runner.ts`
+  - all-brutes orchestration
 - `src/game/detector.ts`
   - page signal collection
 - `src/game/state.ts`
@@ -189,10 +219,14 @@ Main modules:
   - centralized selectors
 - `src/game/navigation.ts`
   - page actions and navigation helpers
+- `src/game/roster.ts`
+  - roster traversal and next-brute settling helpers
 - `src/game/arena.ts`
   - arena readiness and fight-launch flow
 - `src/game/target-resolution.ts`
   - post-login target brute resolution
+- `src/game/startup.ts`
+  - shared login/bootstrap and stabilization helpers
 - `src/game/retry.ts`
   - retry safety helpers
 - `src/reporting/`
@@ -211,6 +245,7 @@ npm run check
 ## Limitations
 
 - The site is dynamic, so some transitions briefly appear as `unknown` before stabilizing.
+- All-brutes mode depends on the in-game `Next Brute` / `Siguiente Bruto` control and assumes it traverses the roster cyclically.
 - The tool assumes the current EternalTwin UI structure that was observed during live testing.
 - If the game changes route shapes, button structure, or text labels, selectors may need updates.
 - Level-up choice remains manual by design.
@@ -225,8 +260,8 @@ Browser-game automation may be subject to game rules or terms of service. You ar
 
 Likely next steps:
 
-- process all brutes in an account
-- make brute selection configurable by name instead of full URL only
 - improve live-state stabilization around transient SPA transitions
+- make brute selection configurable by name instead of full URL only
 - add optional scheduling
 - produce richer run reports
+- add smarter opponent-selection rules
