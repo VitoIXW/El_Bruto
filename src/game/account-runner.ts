@@ -1,7 +1,12 @@
 import type { Page } from 'playwright';
 
 import type { Logger } from '../reporting/logger';
-import type { AccountRunSummary, RunConfig, RunSummary } from '../types/run-types';
+import type {
+  AccountRunSummary,
+  RunConfig,
+  RunSummary,
+  StateDetectionDetails,
+} from '../types/run-types';
 import { captureFailureArtifactsSafely } from '../reporting/artifacts';
 import { formatSummary } from '../reporting/summary';
 import { runCurrentBrute } from './brute-runner';
@@ -102,7 +107,25 @@ async function moveToNextBrute(
   config: RunConfig,
   logger: Logger,
   currentBruteName: string,
+  bruteOrder?: string[],
 ) {
+  if (bruteOrder) {
+    const currentIndex = bruteOrder.indexOf(currentBruteName);
+    if (currentIndex >= 0 && currentIndex + 1 < bruteOrder.length) {
+      const nextBruteName = bruteOrder[currentIndex + 1];
+      const nextCellUrl = buildBruteCellUrl(config.targetUrl, nextBruteName);
+      logger.info(`Continuing directly to the next selected brute cell: ${nextCellUrl}`);
+      await page.goto(nextCellUrl, { waitUntil: 'domcontentloaded' });
+      const nextState = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login');
+      if (nextState.bruteNameFromPage !== nextBruteName) {
+        throw new Error(`Unable to stabilize on the next selected brute ${nextBruteName}.`);
+      }
+      return nextState;
+    }
+
+    return undefined;
+  }
+
   let state = await detectState(page, logger);
   const currentCellUrl = buildBruteCellUrl(config.targetUrl, currentBruteName);
 
@@ -138,30 +161,38 @@ function normalizeBruteSummary(summary: RunSummary, fallbackBruteName: string): 
   };
 }
 
-export async function runAllBrutes(page: Page, config: RunConfig, logger: Logger): Promise<AccountRunSummary> {
-  let state;
+export async function runAllBrutes(
+  page: Page,
+  config: RunConfig,
+  logger: Logger,
+  initialState?: StateDetectionDetails,
+  bruteOrder?: string[],
+): Promise<AccountRunSummary> {
+  let state = initialState;
   const startedBruteName = extractTargetBruteName(config.targetUrl) ?? 'unknown';
 
-  try {
-    state = await bootstrapIntoTargetBrute(page, config, logger);
-  } catch (error) {
-    const artifacts = await captureFailureArtifactsSafely(page, config.artifactsDir, 'bootstrap-failure', logger);
-    logger.error((error as Error).stack ?? String(error));
+  if (!state) {
+    try {
+      state = await bootstrapIntoTargetBrute(page, config, logger);
+    } catch (error) {
+      const artifacts = await captureFailureArtifactsSafely(page, config.artifactsDir, 'bootstrap-failure', logger);
+      logger.error((error as Error).stack ?? String(error));
 
-    const artifactDetails = [
-      artifacts?.screenshotPath ? `Screenshot: ${artifacts.screenshotPath}` : undefined,
-      artifacts?.htmlPath ? `HTML snapshot: ${artifacts.htmlPath}` : undefined,
-    ]
-      .filter((detail): detail is string => Boolean(detail))
-      .join(' | ');
-    const failureReason = [
-      `Bootstrap failed before roster processing: ${String(error)}`,
-      artifactDetails,
-    ]
-      .filter(Boolean)
-      .join(' | ');
+      const artifactDetails = [
+        artifacts?.screenshotPath ? `Screenshot: ${artifacts.screenshotPath}` : undefined,
+        artifacts?.htmlPath ? `HTML snapshot: ${artifacts.htmlPath}` : undefined,
+      ]
+        .filter((detail): detail is string => Boolean(detail))
+        .join(' | ');
+      const failureReason = [
+        `Bootstrap failed before roster processing: ${String(error)}`,
+        artifactDetails,
+      ]
+        .filter(Boolean)
+        .join(' | ');
 
-    return summarizeAccountRun(startedBruteName, [], false, true, failureReason);
+      return summarizeAccountRun(startedBruteName, [], false, true, failureReason);
+    }
   }
 
   const bootstrapBruteName = state.bruteNameFromPage ?? startedBruteName;
@@ -189,7 +220,12 @@ export async function runAllBrutes(page: Page, config: RunConfig, logger: Logger
     logger.info(formatSummary(bruteSummary));
 
     try {
-      state = await moveToNextBrute(page, config, logger, bruteSummary.bruteName);
+      const nextState = await moveToNextBrute(page, config, logger, bruteSummary.bruteName, bruteOrder);
+      if (!nextState) {
+        cycleCompleted = true;
+        break;
+      }
+      state = nextState;
     } catch (error) {
       advanceFailed = true;
       failureReason = `Unable to advance to the next brute after ${bruteSummary.bruteName}: ${String(error)}`;

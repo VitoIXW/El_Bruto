@@ -21,6 +21,13 @@ function buildBruteRunConfig(baseConfig: RunConfig, bruteName: string): RunConfi
   };
 }
 
+function buildAllBrutesRunConfig(baseConfig: RunConfig, bruteName: string): RunConfig {
+  return {
+    ...buildBruteRunConfig(baseConfig, bruteName),
+    executionMode: 'all-brutes',
+  };
+}
+
 async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<typeof createLogger>): Promise<void> {
   const prompter = createConsolePrompter();
   try {
@@ -48,7 +55,11 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
       const selection = await promptForRunSelection(bruteNames, prompter);
 
       if (selection.executionMode === 'all-brutes') {
-        const summary = await runAllBrutes(page, { ...interactiveConfig, executionMode: 'all-brutes' }, logger);
+        const firstBruteName = selection.bruteNames[0];
+        const allBrutesConfig = buildAllBrutesRunConfig(interactiveConfig, firstBruteName);
+        logger.info(`Continuing interactive all-brutes cycle directly from ${allBrutesConfig.targetUrl}.`);
+        const state = await continueToConfiguredBrute(page, allBrutesConfig, logger);
+        const summary = await runAllBrutes(page, allBrutesConfig, logger, state, selection.bruteNames);
         logger.info(formatAccountSummary(summary));
         process.exitCode = accountRunHasFailure(summary) ? 1 : 0;
         return;
