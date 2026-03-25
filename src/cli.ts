@@ -31,6 +31,13 @@ export function parseCliArgs(argv: string[]): CliOptions {
         options.brute = next;
         index += 1;
         break;
+      case '--account':
+        if (!next) {
+          throw new Error('Missing value for --account');
+        }
+        options.account = next;
+        index += 1;
+        break;
       case '--debug':
         options.debug = true;
         break;

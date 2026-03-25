@@ -18,10 +18,16 @@ function resolveTargetBruteName(options: CliOptions): string | undefined {
   return bruteName || undefined;
 }
 
+function resolveAccountLabel(options: CliOptions): string | undefined {
+  const accountLabel = normalizeText(options.account);
+  return accountLabel || undefined;
+}
+
 export function buildConfig(options: CliOptions): RunConfig {
   const bootstrapUrl = buildBootstrapUrl(options.url || DEFAULT_URL);
   const siteOrigin = new URL(bootstrapUrl).origin;
   const targetBruteName = resolveTargetBruteName(options);
+  const accountLabel = resolveAccountLabel(options);
 
   if (options.runStyle === 'automatic' && options.mode === 'single' && !targetBruteName) {
     throw new Error('Automatic single mode requires --brute <name>.');
@@ -34,6 +40,7 @@ export function buildConfig(options: CliOptions): RunConfig {
   return {
     targetUrl,
     targetBruteName,
+    accountLabel,
     bootstrapUrl,
     executionMode: options.mode,
     profileDir: path.resolve(options.profileDir ?? 'playwright-profile'),

@@ -14,7 +14,7 @@ function isActionablePostSubmitState(state: StateDetectionDetails): boolean {
 }
 
 function resolveLoginCredentials(config: RunConfig): LoginCredentials {
-  return config.loginCredentials ?? loadLoginCredentials();
+  return config.loginCredentials ?? loadLoginCredentials(process.cwd(), config.accountLabel);
 }
 
 async function navigateToTargetBrute(page: Page, config: RunConfig, logger: Logger) {

@@ -1,0 +1,9 @@
+{
+  "accounts": [
+    {
+      "label": "Example Account",
+      "username": "EXAMPLE_USERNAME",
+      "password": "EXAMPLE_PASSWORD"
+    }
+  ]
+}

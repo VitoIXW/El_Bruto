@@ -15,6 +15,8 @@ test('parseCliArgs uses defaults', () => {
 
 test('parseCliArgs reads supported flags', () => {
   const options = parseCliArgs([
+    '--account',
+    'Example Account',
     '--brute',
     'TargetBrute',
     '--mode',
@@ -27,6 +29,7 @@ test('parseCliArgs reads supported flags', () => {
     '5000',
   ]);
 
+  assert.equal(options.account, 'Example Account');
   assert.equal(options.brute, 'TargetBrute');
   assert.equal(options.mode, 'all-brutes');
   assert.equal(options.debug, true);

@@ -26,6 +26,7 @@ export interface CliOptions {
   url?: string;
   mode: ExecutionMode;
   brute?: string;
+  account?: string;
   debug: boolean;
   headless: boolean;
   profileDir?: string;
@@ -37,6 +38,7 @@ export interface CliOptions {
 export interface RunConfig {
   targetUrl: string;
   targetBruteName?: string;
+  accountLabel?: string;
   bootstrapUrl: string;
   executionMode: ExecutionMode;
   profileDir: string;
@@ -53,7 +55,7 @@ export interface RunConfig {
 export interface LoginCredentials {
   username: string;
   password: string;
-  source: 'environment' | 'file' | 'saved-account' | 'interactive';
+  source: 'environment' | 'saved-account' | 'interactive';
 }
 
 export interface SavedAccount {

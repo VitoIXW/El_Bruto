@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type { SavedAccount } from '../types/run-types';
+import type { LoginCredentials, SavedAccount } from '../types/run-types';
 import { normalizeText } from '../game/selectors';
 
 const ACCOUNTS_FILE_NAME = '.accounts.local.json';
@@ -41,6 +41,50 @@ export function loadSavedAccounts(baseDir = process.cwd()): SavedAccount[] {
   return storedAccounts
     .map(sanitizeAccount)
     .filter((account): account is SavedAccount => Boolean(account));
+}
+
+export function findSavedAccount(label: string, baseDir = process.cwd()): SavedAccount | undefined {
+  const normalizedLabel = normalizeText(label);
+  if (!normalizedLabel) {
+    return undefined;
+  }
+
+  return loadSavedAccounts(baseDir).find((account) => account.label === normalizedLabel);
+}
+
+export function resolveSavedAccountCredentials(
+  baseDir = process.cwd(),
+  preferredLabel?: string,
+): LoginCredentials | undefined {
+  const accounts = loadSavedAccounts(baseDir);
+  if (accounts.length === 0) {
+    return undefined;
+  }
+
+  if (preferredLabel) {
+    const matchedAccount = findSavedAccount(preferredLabel, baseDir);
+    if (!matchedAccount) {
+      throw new Error(`Saved account "${preferredLabel}" was not found in ${ACCOUNTS_FILE_NAME}.`);
+    }
+
+    return {
+      username: matchedAccount.username,
+      password: matchedAccount.password,
+      source: 'saved-account',
+    };
+  }
+
+  if (accounts.length === 1) {
+    return {
+      username: accounts[0].username,
+      password: accounts[0].password,
+      source: 'saved-account',
+    };
+  }
+
+  throw new Error(
+    `Multiple saved accounts were found in ${ACCOUNTS_FILE_NAME}. Use --account <label> or set ET_USERNAME and ET_PASSWORD explicitly.`,
+  );
 }
 
 export function saveAccount(account: SavedAccount, baseDir = process.cwd()): SavedAccount[] {

@@ -38,11 +38,13 @@ test('buildConfig uses the selected brute and headless setting for automatic sin
     runStyle: 'automatic',
     url: 'https://brute.eternaltwin.org/',
     mode: 'single',
+    account: 'Example Account',
     brute: 'TargetBrute',
     debug: false,
     headless: true,
   });
 
+  assert.equal(config.accountLabel, 'Example Account');
   assert.equal(config.targetBruteName, 'TargetBrute');
   assert.equal(config.targetUrl, 'https://brute.eternaltwin.org/TargetBrute/cell');
   assert.equal(config.headless, true);
