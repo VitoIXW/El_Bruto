@@ -15,8 +15,11 @@ export type FinalStatus =
   | 'stabilization_timeout'
   | 'error';
 
+export type ExecutionMode = 'single' | 'all-brutes';
+
 export interface CliOptions {
   url: string;
+  mode: ExecutionMode;
   debug: boolean;
   profileDir?: string;
   artifactsDir?: string;
@@ -27,6 +30,7 @@ export interface CliOptions {
 export interface RunConfig {
   targetUrl: string;
   bootstrapUrl: string;
+  executionMode: ExecutionMode;
   profileDir: string;
   artifactsDir: string;
   logsDir: string;
@@ -57,4 +61,18 @@ export interface RunSummary {
   levelUpDetected: boolean;
   errorsOccurred: boolean;
   artifacts?: FailureArtifacts;
+}
+
+export interface AccountRunSummary {
+  mode: 'all-brutes';
+  startedBruteName: string;
+  cycleCompleted: boolean;
+  advanceFailed: boolean;
+  failureReason?: string;
+  totalBrutesProcessed: number;
+  totalFightsCompleted: number;
+  restingCount: number;
+  manualInterventionCount: number;
+  errorCount: number;
+  brutes: RunSummary[];
 }

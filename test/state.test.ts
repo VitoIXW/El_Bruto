@@ -133,6 +133,32 @@ test('classifyState detects Spanish level-up page on cell route', () => {
   assert.equal(result.state, 'level_up');
 });
 
+test('classifyState does not misclassify a normal cell as level-up from ambiguous generic controls', () => {
+  const result = classifyState({
+    url: 'https://brute.eternaltwin.org/TargetBrute/cell',
+    hasLoginForm: false,
+    hasPasswordInput: false,
+    hasPublicLoginButton: false,
+    hasSearchBruteInput: false,
+    hasPublicBruteNotFoundText: false,
+    hasUnknownBruteUrl: false,
+    hasArenaLink: true,
+    hasArenaWelcomeText: false,
+    hasArenaSearchInput: false,
+    hasArenaGoButton: false,
+    hasOpponentLinks: false,
+    hasPreFightControl: false,
+    hasVersusText: false,
+    hasFightReturnLinks: false,
+    hasRestingText: false,
+    hasLevelUpHeading: false,
+    hasLevelUpChoiceText: true,
+    bruteNameFromPage: 'TargetBrute',
+  });
+
+  assert.equal(result.state, 'cell_ready');
+});
+
 test('classifyState keeps pre-fight distinct from arena selection on fight URLs', () => {
   const result = classifyState({
     url: 'https://brute.eternaltwin.org/fight/123',

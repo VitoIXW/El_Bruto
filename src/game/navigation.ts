@@ -1,8 +1,18 @@
 import type { Locator, Page } from 'playwright';
 
-import { selectors, buildCellHrefPattern, normalizeText } from './selectors';
+import { selectors, buildCellHrefPattern, buildCellUrl, normalizeText } from './selectors';
+
+export function extractBruteNameFromUrl(url: string): string | undefined {
+  const match = url.match(/brute\.eternaltwin\.org\/([^/]+)\/(cell|arena|fight|versus)/i);
+  return match?.[1];
+}
 
 export async function extractBruteName(page: Page): Promise<string | undefined> {
+  const bruteNameFromUrl = extractBruteNameFromUrl(page.url());
+  if (page.url().endsWith('/cell') && bruteNameFromUrl) {
+    return bruteNameFromUrl;
+  }
+
   const heading = page.locator(selectors.cell.bruteNameHeading).first();
   if (await heading.count()) {
     const text = normalizeText(await heading.textContent());
@@ -11,12 +21,15 @@ export async function extractBruteName(page: Page): Promise<string | undefined> 
     }
   }
 
-  const match = page.url().match(/brute\.eternaltwin\.org\/([^/]+)\/(cell|arena|fight|versus)/i);
-  return match?.[1];
+  return bruteNameFromUrl;
 }
 
 export async function clickArena(page: Page): Promise<void> {
   await page.locator(selectors.cell.arenaLink).first().click();
+}
+
+export async function clickNextBrute(page: Page): Promise<void> {
+  await page.locator(selectors.cell.nextBruteControl).first().click();
 }
 
 export async function chooseFirstOpponent(page: Page): Promise<void> {
@@ -60,6 +73,22 @@ export async function clickReturnToCurrentCell(page: Page, bruteName: string): P
 
 export async function waitForUrlSuffix(page: Page, suffix: string, timeoutMs: number): Promise<void> {
   await page.waitForURL((url) => url.pathname.endsWith(suffix), { timeout: timeoutMs });
+}
+
+export async function waitForDifferentBruteCell(
+  page: Page,
+  currentBruteName: string,
+  timeoutMs: number,
+): Promise<void> {
+  const currentPattern = buildCellHrefPattern(currentBruteName);
+  await page.waitForURL((url) => {
+    const pathname = url.pathname;
+    return pathname.endsWith('/cell') && !pathname.includes(currentPattern);
+  }, { timeout: timeoutMs });
+}
+
+export function buildBruteCellUrl(baseUrl: string, bruteName: string): string {
+  return buildCellUrl(new URL(baseUrl).origin, bruteName);
 }
 
 export async function hasVisible(locator: Locator): Promise<boolean> {

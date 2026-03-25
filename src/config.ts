@@ -17,6 +17,7 @@ export function buildConfig(options: CliOptions): RunConfig {
   return {
     targetUrl,
     bootstrapUrl: buildBootstrapUrl(targetUrl),
+    executionMode: options.mode,
     profileDir: path.resolve(options.profileDir ?? 'playwright-profile'),
     artifactsDir: path.resolve(options.artifactsDir ?? 'artifacts'),
     logsDir: path.resolve(options.logsDir ?? 'logs'),
