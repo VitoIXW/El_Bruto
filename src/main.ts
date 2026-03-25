@@ -71,7 +71,7 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
         logger.info(`Continuing interactive all-brutes cycle directly from ${allBrutesConfig.targetUrl}.`);
         const state = await continueToConfiguredBrute(page, allBrutesConfig, logger);
         const summary = await runAllBrutes(page, allBrutesConfig, logger, state, selection.bruteNames);
-        logger.info(formatAccountSummary(summary));
+        logger.info(formatAccountSummary(summary, { color: logger.supportsColor }));
         process.exitCode = accountRunHasFailure(summary) ? 1 : 0;
         return;
       }
@@ -83,7 +83,7 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
         const state = await continueToConfiguredBrute(page, bruteConfig, logger);
         const summary = await runCurrentBrute(page, bruteConfig, logger, state);
         summaries.push(summary);
-        logger.info(formatSummary(summary));
+        logger.info(formatSummary(summary, { color: logger.supportsColor }));
       }
 
       process.exitCode = summaries.some((summary) => summary.errorsOccurred) ? 1 : 0;
@@ -111,13 +111,13 @@ async function main(): Promise<void> {
   try {
     if (config.executionMode === 'all-brutes') {
       const summary = await runAllBrutes(page, config, logger);
-      logger.info(formatAccountSummary(summary));
+      logger.info(formatAccountSummary(summary, { color: logger.supportsColor }));
       process.exitCode = accountRunHasFailure(summary) ? 1 : 0;
       return;
     }
 
     const summary = await runBrute(page, config, logger);
-    logger.info(formatSummary(summary));
+    logger.info(formatSummary(summary, { color: logger.supportsColor }));
     process.exitCode = summary.errorsOccurred ? 1 : 0;
   } finally {
     await context.close();
