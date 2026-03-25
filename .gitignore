@@ -4,3 +4,4 @@ logs/
 artifacts/
 playwright-profile/
 .credentials.local.json
+.accounts.local.json
