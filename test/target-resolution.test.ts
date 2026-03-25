@@ -29,8 +29,16 @@ test('isTargetBruteLoaded detects when the target brute is already loaded', () =
   );
 });
 
+test('isTransientState keeps login_form and authenticated_home actionable during login bootstrap', () => {
+  assert.equal(isTransientState('login_form', 'login'), false);
+  assert.equal(isTransientState('authenticated_home', 'login'), false);
+  assert.equal(isTransientState('public_home', 'login'), true);
+});
+
 test('isTransientState matches the post-login transient states only', () => {
   assert.equal(isTransientState('login_required'), true);
+  assert.equal(isTransientState('login_form'), true);
+  assert.equal(isTransientState('authenticated_home'), true);
   assert.equal(isTransientState('unknown'), true);
   assert.equal(isTransientState('cell_ready'), false);
 });

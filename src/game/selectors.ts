@@ -6,7 +6,7 @@ export const selectors = {
     passwordInput: 'input[type="password"]',
     loginButton: 'a:has-text("Log in"), button:has-text("Log in"), a:has-text("Conectarse"), button:has-text("Conectarse")',
     submitButton:
-      'form button[type="submit"], form input[type="submit"], form button:has-text("Log in"), form button:has-text("Conectarse"), form button:has-text("Iniciar sesión")',
+      'button[type="submit"], input[type="submit"], button:has-text("Log in"), button:has-text("Conectarse"), button:has-text("Iniciar sesión")',
     searchBruteInput:
       'input[placeholder*="Search a Brute" i], input[aria-label*="Search a Brute" i], input[placeholder*="Buscar un bruto" i], input[aria-label*="Buscar un bruto" i]',
     bruteNotFoundText: 'text=/brute not found|bruto no encontrado/i',

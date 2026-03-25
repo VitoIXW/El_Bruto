@@ -33,6 +33,8 @@ const ARENA_NAME_BLACKLIST = new Set([
   'go!',
   'vs',
 ]);
+const LOGIN_SUBMIT_READY_TIMEOUT_MS = 3000;
+const LOGIN_SUBMIT_READY_POLL_MS = 100;
 
 export function extractBruteNameFromUrl(url: string): string | undefined {
   const match = url.match(/brute\.eternaltwin\.org\/([^/]+)\/(cell|arena|fight|versus)/i);
@@ -68,7 +70,20 @@ export async function submitLoginForm(page: Page, username: string, password: st
   const form = page.locator(selectors.login.loginForm).first();
   await form.locator(selectors.login.usernameInput).first().fill(username);
   await form.locator(selectors.login.passwordInput).first().fill(password);
-  await form.locator(selectors.login.submitButton).first().click();
+  const submitControl = form.locator(selectors.login.submitButton).first();
+  await submitControl.waitFor({ state: 'visible', timeout: LOGIN_SUBMIT_READY_TIMEOUT_MS });
+
+  const deadline = Date.now() + LOGIN_SUBMIT_READY_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (await submitControl.isEnabled()) {
+      await submitControl.click();
+      return;
+    }
+
+    await page.waitForTimeout(LOGIN_SUBMIT_READY_POLL_MS);
+  }
+
+  throw new Error('Login submit control did not become enabled after credentials were filled.');
 }
 
 export async function clickFirstHomeBrute(page: Page): Promise<void> {

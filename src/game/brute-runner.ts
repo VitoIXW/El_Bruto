@@ -2,13 +2,14 @@ import type { Page } from 'playwright';
 
 import type { Logger } from '../reporting/logger';
 import type { FailureArtifacts, PageState, RunConfig, RunSummary, StateDetectionDetails } from '../types/run-types';
-import { captureFailureArtifacts } from '../reporting/artifacts';
+import { captureFailureArtifacts, captureFailureArtifactsSafely } from '../reporting/artifacts';
 import { formatSummary } from '../reporting/summary';
 import { launchFightFromPreFight, selectOpponent } from './arena';
 import { detectState } from './detector';
 import { clickArena, clickReturnToCurrentCell, waitForUrlSuffix } from './navigation';
 import { canRetryFromState } from './retry';
 import { bootstrapIntoTargetBrute, waitForStableGameState } from './startup';
+import { extractTargetBruteName } from './target-resolution';
 
 async function executeStateSafeAction(
   page: Page,
@@ -43,8 +44,32 @@ async function executeStateSafeAction(
 }
 
 export async function runBrute(page: Page, config: RunConfig, logger: Logger): Promise<RunSummary> {
-  const state = await bootstrapIntoTargetBrute(page, config, logger);
-  return runCurrentBrute(page, config, logger, state);
+  try {
+    const state = await bootstrapIntoTargetBrute(page, config, logger);
+    return runCurrentBrute(page, config, logger, state);
+  } catch (error) {
+    const artifacts = await captureFailureArtifactsSafely(page, config.artifactsDir, 'bootstrap-failure', logger);
+    logger.error((error as Error).stack ?? String(error));
+    let finalStatus: RunSummary['finalStatus'] = 'error';
+
+    if ((error as Error).message.includes('Stable game state timeout [phase=login]')) {
+      finalStatus = 'login_timeout';
+    }
+
+    if ((error as Error).message.includes('Stable game state timeout [phase=post_login]')) {
+      finalStatus = 'stabilization_timeout';
+    }
+
+    return {
+      bruteName: extractTargetBruteName(config.targetUrl) ?? 'unknown',
+      fightsCompleted: 0,
+      finalStatus,
+      restingReached: false,
+      levelUpDetected: false,
+      errorsOccurred: true,
+      artifacts,
+    };
+  }
 }
 
 export async function runCurrentBrute(

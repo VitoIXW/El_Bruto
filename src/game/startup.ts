@@ -18,7 +18,7 @@ export async function waitForStableGameState(
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const state = await detectState(page, logger);
-    if (!isTransientState(state.state)) {
+    if (!isTransientState(state.state, phase)) {
       return state;
     }
     await page.waitForTimeout(1000);
