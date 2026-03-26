@@ -1,5 +1,7 @@
 # El Bruto Arena Runner
 
+Español | [English](README.en.md)
+
 CLI en TypeScript + Playwright para automatizar combates de **La Brute / El Bruto** en EternalTwin.
 
 El proyecto tiene ahora dos formas de uso:
