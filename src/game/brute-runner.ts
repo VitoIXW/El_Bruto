@@ -160,6 +160,18 @@ export async function runCurrentBrute(
           continue;
         case 'level_up':
           levelUpDetected = true;
+          if (
+            !config.headless &&
+            config.interactiveLevelUpBehavior === 'wait_for_manual_resume' &&
+            config.onInteractiveLevelUpReady
+          ) {
+            logger.info(`Level-up detected for ${bruteName}. Waiting for manual confirmation to continue.`);
+            await config.onInteractiveLevelUpReady(bruteName);
+            state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login');
+            bruteName = state.bruteNameFromPage ?? bruteName;
+            continue;
+          }
+
           finalStatus = 'manual_intervention_required';
           return {
             bruteName,
