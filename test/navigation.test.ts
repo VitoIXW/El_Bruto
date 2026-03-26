@@ -363,6 +363,325 @@ test('listHallRosterBrutes logs hall discovery steps and finds roster candidates
   assert.match(logs[4] ?? '', /\[hall\] Resolved 2 hall brute name\(s\): ExampleBrute, TargetBrute/);
 });
 
+test('listHallRosterBrutes does not choose a repeated non-roster container over a valid roster candidate', { concurrency: false }, async () => {
+  const logs: string[] = [];
+  const hallContainers = [
+    {
+      entries: [
+        {
+          text: 'Resumen',
+          attributes: { 'aria-label': null, title: null },
+          nameNodes: ['Resumen'],
+          statIcons: 0,
+          fights: 0,
+        },
+      ],
+    },
+    {
+      entries: [
+        {
+          text: 'Nivel 18 ExampleBrute',
+          attributes: { 'aria-label': 'Te quedan 0 combates para el día de hoy.', title: null },
+          nameNodes: ['ExampleBrute'],
+          statIcons: 3,
+          fights: 1,
+        },
+        {
+          text: 'Nivel 16 TargetBrute',
+          attributes: { 'aria-label': 'Te quedan 1 combates para el día de hoy.', title: null },
+          nameNodes: ['TargetBrute'],
+          statIcons: 3,
+          fights: 1,
+        },
+      ],
+    },
+    {
+      entries: [
+        {
+          text: 'Versión beta Este juego está todavía en beta.',
+          attributes: { 'aria-label': null, title: null },
+          nameNodes: ['Versión beta'],
+          statIcons: 0,
+          fights: 0,
+        },
+        {
+          text: 'Repórtalo en nuestro Discord',
+          attributes: { 'aria-label': null, title: null },
+          nameNodes: ['Discord'],
+          statIcons: 0,
+          fights: 0,
+        },
+      ],
+    },
+  ];
+
+  const page = {
+    async goto() {},
+    locator(selector: string) {
+      if (selector === selectors.hall.rosterContainer) {
+        return {
+          async count() {
+            return hallContainers.length;
+          },
+          nth(containerIndex: number) {
+            const hallContainer = hallContainers[containerIndex];
+            return {
+              locator(subSelector: string) {
+                assert.ok([
+                  selectors.hall.rosterEntries,
+                  selectors.hall.descendantRosterEntries,
+                ].includes(subSelector));
+                return {
+                  first() {
+                    return this;
+                  },
+                  async waitFor() {},
+                  async count() {
+                    return hallContainer.entries.length;
+                  },
+                  nth(index: number) {
+                    const entry = hallContainer.entries[index];
+                    return {
+                      async getAttribute(name: string) {
+                        return entry.attributes[name as 'aria-label' | 'title'];
+                      },
+                      async boundingBox() {
+                        return null;
+                      },
+                      async innerText() {
+                        return entry.text;
+                      },
+                      locator(innerSelector: string) {
+                        if (innerSelector === selectors.hall.entryName) {
+                          return {
+                            async count() {
+                              return entry.nameNodes.length;
+                            },
+                            nth(candidateIndex: number) {
+                              return {
+                                async innerText() {
+                                  return entry.nameNodes[candidateIndex];
+                                },
+                              };
+                            },
+                          };
+                        }
+
+                        if (innerSelector === selectors.hall.entryStatIcons) {
+                          return {
+                            async count() {
+                              return entry.statIcons;
+                            },
+                          };
+                        }
+
+                        if (innerSelector === selectors.hall.entryFightAvailability) {
+                          return {
+                            async count() {
+                              return entry.fights;
+                            },
+                          };
+                        }
+
+                        throw new Error(`Unexpected entry selector: ${innerSelector}`);
+                      },
+                    };
+                  },
+                };
+              },
+            };
+          },
+        };
+      }
+
+      throw new Error(`Unexpected selector: ${selector}`);
+    },
+  };
+
+  const logger = {
+    info(message: string) {
+      logs.push(message);
+    },
+    warn() {},
+    error() {},
+    debug() {},
+    logFilePath: '/tmp/example.log',
+  };
+
+  const result = await listHallRosterBrutes(page as never, 'https://brute.eternaltwin.org/', logger);
+
+  assert.deepEqual(result, ['ExampleBrute', 'TargetBrute']);
+  assert.match(logs[2] ?? '', /\[hall\] Selected hall roster candidate #1 using direct entry discovery with 2 entries, 2 structurally valid, 2 extracted names\./);
+});
+
+test('listHallRosterBrutes waits for hall roster cards to render before failing on non-roster containers', { concurrency: false }, async () => {
+  const logs: string[] = [];
+  let scanPhase = 0;
+
+  const hallContainersByPhase = [
+    [
+      {
+        entries: [
+          {
+            text: 'Versión beta Este juego está todavía en beta.',
+            attributes: { 'aria-label': null, title: null },
+            nameNodes: ['Versión beta'],
+            statIcons: 0,
+            fights: 0,
+          },
+          {
+            text: 'Repórtalo en nuestro Discord',
+            attributes: { 'aria-label': null, title: null },
+            nameNodes: ['Discord'],
+            statIcons: 0,
+            fights: 0,
+          },
+        ],
+      },
+    ],
+    [
+      {
+        entries: [
+          {
+            text: 'Versión beta Este juego está todavía en beta.',
+            attributes: { 'aria-label': null, title: null },
+            nameNodes: ['Versión beta'],
+            statIcons: 0,
+            fights: 0,
+          },
+          {
+            text: 'Repórtalo en nuestro Discord',
+            attributes: { 'aria-label': null, title: null },
+            nameNodes: ['Discord'],
+            statIcons: 0,
+            fights: 0,
+          },
+        ],
+      },
+      {
+        entries: [
+          {
+            text: 'Nivel 18 ExampleBrute',
+            attributes: { 'aria-label': 'Te quedan 0 combates para el día de hoy.', title: null },
+            nameNodes: ['ExampleBrute'],
+            statIcons: 3,
+            fights: 1,
+          },
+          {
+            text: 'Nivel 16 TargetBrute',
+            attributes: { 'aria-label': 'Te quedan 1 combates para el día de hoy.', title: null },
+            nameNodes: ['TargetBrute'],
+            statIcons: 3,
+            fights: 1,
+          },
+        ],
+      },
+    ],
+  ];
+
+  const page = {
+    async goto() {},
+    async waitForTimeout() {
+      scanPhase = 1;
+    },
+    locator(selector: string) {
+      if (selector === selectors.hall.rosterContainer) {
+        return {
+          async count() {
+            return hallContainersByPhase[scanPhase].length;
+          },
+          nth(containerIndex: number) {
+            const hallContainer = hallContainersByPhase[scanPhase][containerIndex];
+            return {
+              locator(subSelector: string) {
+                assert.ok([
+                  selectors.hall.rosterEntries,
+                  selectors.hall.descendantRosterEntries,
+                ].includes(subSelector));
+                return {
+                  first() {
+                    return this;
+                  },
+                  async waitFor() {},
+                  async count() {
+                    return hallContainer.entries.length;
+                  },
+                  nth(index: number) {
+                    const entry = hallContainer.entries[index];
+                    return {
+                      async getAttribute(name: string) {
+                        return entry.attributes[name as 'aria-label' | 'title'];
+                      },
+                      async boundingBox() {
+                        return null;
+                      },
+                      async innerText() {
+                        return entry.text;
+                      },
+                      locator(innerSelector: string) {
+                        if (innerSelector === selectors.hall.entryName) {
+                          return {
+                            async count() {
+                              return entry.nameNodes.length;
+                            },
+                            nth(candidateIndex: number) {
+                              return {
+                                async innerText() {
+                                  return entry.nameNodes[candidateIndex];
+                                },
+                              };
+                            },
+                          };
+                        }
+
+                        if (innerSelector === selectors.hall.entryStatIcons) {
+                          return {
+                            async count() {
+                              return entry.statIcons;
+                            },
+                          };
+                        }
+
+                        if (innerSelector === selectors.hall.entryFightAvailability) {
+                          return {
+                            async count() {
+                              return entry.fights;
+                            },
+                          };
+                        }
+
+                        throw new Error(`Unexpected entry selector: ${innerSelector}`);
+                      },
+                    };
+                  },
+                };
+              },
+            };
+          },
+        };
+      }
+
+      throw new Error(`Unexpected selector: ${selector}`);
+    },
+  };
+
+  const logger = {
+    info(message: string) {
+      logs.push(message);
+    },
+    warn() {},
+    error() {},
+    debug() {},
+    logFilePath: '/tmp/example.log',
+  };
+
+  const result = await listHallRosterBrutes(page as never, 'https://brute.eternaltwin.org/', logger);
+
+  assert.deepEqual(result, ['ExampleBrute', 'TargetBrute']);
+  assert.match(logs[1] ?? '', /\[hall\] Found 1 hall roster container candidate\(s\)\./);
+  assert.match(logs[2] ?? '', /\[hall\] Selected hall roster candidate #1 using direct entry discovery with 2 entries, 2 structurally valid, 2 extracted names\./);
+});
+
 test('listHallRosterBrutes falls back to descendant hall entries to return the full roster and logs rejected entries', async () => {
   const logs: string[] = [];
   const hallContainers = [
@@ -686,7 +1005,7 @@ test('listHallRosterBrutes deduplicates overlapping descendant matches so one br
   assert.match(logs[3] ?? '', /Accepted hall entries \(2\/2\): #0:ExampleBrute \|\| #1:TargetBrute/);
 });
 
-test('listHallRosterBrutes reports when container candidates exist but none meet the repeated-entry threshold', async () => {
+test('listHallRosterBrutes can fall back to the earliest structurally valid hall candidate when repetition evidence is absent', async () => {
   const hallContainers = [
     {
       entries: [
@@ -795,10 +1114,9 @@ test('listHallRosterBrutes reports when container candidates exist but none meet
     },
   };
 
-  await assert.rejects(
-    () => listHallRosterBrutes(page as never, 'https://brute.eternaltwin.org/'),
-    /none contained repeated roster entries/i,
-  );
+  const result = await listHallRosterBrutes(page as never, 'https://brute.eternaltwin.org/');
+
+  assert.deepEqual(result, ['ExampleBrute']);
 });
 
 test('listHallRosterBrutes rejects repeated non-roster hall controls and surfaces actionable diagnostics', async () => {

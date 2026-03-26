@@ -38,6 +38,7 @@ const ARENA_NAME_BLACKLIST = new Set([
 const LOGIN_SUBMIT_READY_TIMEOUT_MS = 3000;
 const LOGIN_SUBMIT_READY_POLL_MS = 100;
 const HALL_ROSTER_READY_TIMEOUT_MS = 5000;
+const HALL_ROSTER_RETRY_POLL_MS = 250;
 const HALL_ENTRY_BLACKLIST = new Set([
   'hall',
   'ranking',
@@ -83,6 +84,12 @@ interface HallContainerInspection {
 interface NormalizedHallEntries {
   count: number;
   nth(index: number): Locator;
+}
+
+interface HallContainerScan {
+  containerCount: number;
+  inspections: HallContainerInspection[];
+  selected?: HallContainerInspection;
 }
 
 function logHallDiscovery(logger: Logger | undefined, message: string): void {
@@ -450,6 +457,48 @@ async function inspectHallContainer(
   return strategies[0];
 }
 
+function selectHallContainer(inspections: HallContainerInspection[]): HallContainerInspection | undefined {
+  return inspections
+    .filter((inspection) =>
+      inspection.acceptedEntryCount > 0 || inspection.repeatedEntryCount >= HALL_REPEATED_ENTRY_THRESHOLD)
+    .sort((left, right) => {
+      if ((left.acceptedEntryCount > 0) !== (right.acceptedEntryCount > 0)) {
+        return left.acceptedEntryCount > 0 ? -1 : 1;
+      }
+      if (left.acceptedEntryCount !== right.acceptedEntryCount) {
+        return right.acceptedEntryCount - left.acceptedEntryCount;
+      }
+      if (left.extractedNameCount !== right.extractedNameCount) {
+        return right.extractedNameCount - left.extractedNameCount;
+      }
+      if (left.repeatedEntryCount !== right.repeatedEntryCount) {
+        return right.repeatedEntryCount - left.repeatedEntryCount;
+      }
+      if (left.entryCount !== right.entryCount) {
+        return right.entryCount - left.entryCount;
+      }
+      return left.index - right.index;
+    })[0];
+}
+
+async function scanHallContainers(page: Page): Promise<HallContainerScan> {
+  const rosterContainers = page.locator(selectors.hall.rosterContainer);
+  const containerCount = await rosterContainers.count().catch(() => 0);
+
+  const inspections: HallContainerInspection[] = [];
+  for (let index = 0; index < containerCount; index += 1) {
+    const container = rosterContainers.nth(index);
+    const inspection = await inspectHallContainer(container, index);
+    inspections.push(inspection);
+  }
+
+  return {
+    containerCount,
+    inspections,
+    selected: selectHallContainer(inspections),
+  };
+}
+
 async function readVisibleHomeBruteEntries(page: Page): Promise<HomeBruteEntryCandidate[]> {
   const bruteLinks = page.locator(selectors.home.rosterBruteEntries);
   const count = await bruteLinks.count();
@@ -491,41 +540,32 @@ export async function listHallRosterBrutes(
   logHallDiscovery(logger, `Opening hall roster page ${hallUrl}`);
   await page.goto(hallUrl, { waitUntil: 'domcontentloaded' });
 
-  const rosterContainers = page.locator(selectors.hall.rosterContainer);
-  const containerCount = await rosterContainers.count().catch(() => 0);
-  if (containerCount === 0) {
+  let hallScan = await scanHallContainers(page);
+  if (hallScan.containerCount === 0) {
     logHallDiscovery(
       logger,
       `No roster container candidates matched selector "${selectors.hall.rosterContainer}" on ${hallUrl}`,
     );
     throw new Error(`Hall roster container candidates were not found on ${hallUrl}.`);
   }
-  logHallDiscovery(logger, `Found ${containerCount} hall roster container candidate(s).`);
+  logHallDiscovery(logger, `Found ${hallScan.containerCount} hall roster container candidate(s).`);
 
-  const containerInspections: HallContainerInspection[] = [];
-  for (let index = 0; index < containerCount; index += 1) {
-    const container = rosterContainers.nth(index);
-    const inspection = await inspectHallContainer(container, index);
-    containerInspections.push(inspection);
+  const hallRetryDeadline = Date.now() + HALL_ROSTER_READY_TIMEOUT_MS;
+  while (
+    (!hallScan.selected || hallScan.selected.acceptedEntryCount === 0)
+    && Date.now() < hallRetryDeadline
+  ) {
+    if (typeof page.waitForTimeout !== 'function') {
+      break;
+    }
+    await page.waitForTimeout(HALL_ROSTER_RETRY_POLL_MS);
+    const rescannedHall = await scanHallContainers(page);
+    if (rescannedHall.containerCount > 0) {
+      hallScan = rescannedHall;
+    }
   }
 
-  const selectedContainer = containerInspections
-    .filter((inspection) => inspection.repeatedEntryCount >= HALL_REPEATED_ENTRY_THRESHOLD)
-    .sort((left, right) => {
-      if (left.repeatedEntryCount !== right.repeatedEntryCount) {
-        return right.repeatedEntryCount - left.repeatedEntryCount;
-      }
-      if (left.acceptedEntryCount !== right.acceptedEntryCount) {
-        return right.acceptedEntryCount - left.acceptedEntryCount;
-      }
-      if (left.extractedNameCount !== right.extractedNameCount) {
-        return right.extractedNameCount - left.extractedNameCount;
-      }
-      if (left.entryCount !== right.entryCount) {
-        return right.entryCount - left.entryCount;
-      }
-      return left.index - right.index;
-    })[0];
+  const { inspections: containerInspections, selected: selectedContainer, containerCount } = hallScan;
 
   if (!selectedContainer) {
     logHallDiscovery(
