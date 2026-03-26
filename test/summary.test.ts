@@ -23,6 +23,7 @@ test('formatSummary includes artifact paths when present', () => {
   assert.match(text, /Status: resting/);
   assert.match(text, /Wins: 1/);
   assert.match(text, /Losses: 1/);
+  assert.match(text, /Win rate: 50.0%/);
   assert.match(text, /Screenshot: artifacts\/example\.png/);
   assert.match(text, /HTML snapshot: artifacts\/example\.html/);
 });
@@ -90,9 +91,10 @@ test('formatAccountSummary includes aggregate counts and per-brute results', () 
   assert.match(text, /Total fights: 5/);
   assert.match(text, /Total wins: 3/);
   assert.match(text, /Total losses: 2/);
+  assert.match(text, /Win rate: 60.0%/);
   assert.match(text, /Manual intervention: 1/);
-  assert.match(text, /- ExampleBrute \| status=resting \| fights=3 \| wins=2 \| losses=1/);
-  assert.match(text, /- TargetBrute \| status=manual intervention required \| fights=2 \| wins=1 \| losses=1/);
+  assert.match(text, /- ExampleBrute \| status=resting \| fights=3 \| wins=2 \| losses=1 \| win-rate=66.7%/);
+  assert.match(text, /- TargetBrute \| status=manual intervention required \| fights=2 \| wins=1 \| losses=1 \| win-rate=50.0%/);
 });
 
 test('formatAccountSummary makes incomplete-cycle advance failure explicit', () => {
