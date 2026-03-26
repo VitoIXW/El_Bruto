@@ -6,7 +6,7 @@ import { captureFailureArtifacts, captureFailureArtifactsSafely } from '../repor
 import { formatSummary } from '../reporting/summary';
 import { launchFightFromPreFight, selectOpponent } from './arena';
 import { detectState } from './detector';
-import { clickArena, clickReturnToCurrentCell, waitForUrlSuffix } from './navigation';
+import { clickArena, clickReturnToCurrentCell, readLatestCellFightOutcome, waitForUrlSuffix } from './navigation';
 import { canRetryFromState } from './retry';
 import { bootstrapIntoTargetBrute, waitForStableGameState } from './startup';
 import { extractTargetBruteName } from './target-resolution';
@@ -63,6 +63,8 @@ export async function runBrute(page: Page, config: RunConfig, logger: Logger): P
     return {
       bruteName: extractTargetBruteName(config.targetUrl) ?? 'unknown',
       fightsCompleted: 0,
+      wins: 0,
+      losses: 0,
       finalStatus,
       restingReached: false,
       levelUpDetected: false,
@@ -80,6 +82,8 @@ export async function runCurrentBrute(
 ): Promise<RunSummary> {
   let bruteName = 'unknown';
   let fightsCompleted = 0;
+  let wins = 0;
+  let losses = 0;
   let restingReached = false;
   let levelUpDetected = false;
   let errorsOccurred = false;
@@ -101,6 +105,8 @@ export async function runCurrentBrute(
           return {
             bruteName,
             fightsCompleted,
+            wins,
+            losses,
             finalStatus,
             restingReached,
             levelUpDetected,
@@ -131,15 +137,35 @@ export async function runCurrentBrute(
             await clickReturnToCurrentCell(page, bruteName);
             await waitForUrlSuffix(page, '/cell', config.stepTimeoutMs);
           }, config.maxActionRetries, logger, 'Return to brute cell');
+
+          await page.waitForLoadState('domcontentloaded');
+          state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login');
+          bruteName = state.bruteNameFromPage ?? bruteName;
+
+          const fightOutcome = await readLatestCellFightOutcome(
+            page,
+            Math.min(config.stepTimeoutMs, 2000),
+          );
           fightsCompleted += 1;
+
+          if (fightOutcome === 'win') {
+            wins += 1;
+          } else if (fightOutcome === 'loss') {
+            losses += 1;
+          } else {
+            logger.warn('Could not determine the latest fight outcome from the cell event log.');
+          }
+
           logger.info(`Fight completed. Total fights: ${fightsCompleted}`);
-          break;
+          continue;
         case 'level_up':
           levelUpDetected = true;
           finalStatus = 'manual_intervention_required';
           return {
             bruteName,
             fightsCompleted,
+            wins,
+            losses,
             finalStatus,
             restingReached,
             levelUpDetected,
@@ -178,6 +204,8 @@ export async function runCurrentBrute(
     logger.error(formatSummary({
       bruteName,
       fightsCompleted,
+      wins,
+      losses,
       finalStatus,
       restingReached,
       levelUpDetected,
@@ -188,6 +216,8 @@ export async function runCurrentBrute(
     return {
       bruteName,
       fightsCompleted,
+      wins,
+      losses,
       finalStatus,
       restingReached,
       levelUpDetected,

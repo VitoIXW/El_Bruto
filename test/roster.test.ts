@@ -27,6 +27,8 @@ test('summarizeAccountRun aggregates per-brute outcomes', () => {
       {
         bruteName: 'ExampleBrute',
         fightsCompleted: 2,
+        wins: 1,
+        losses: 1,
         finalStatus: 'resting',
         restingReached: true,
         levelUpDetected: false,
@@ -35,6 +37,8 @@ test('summarizeAccountRun aggregates per-brute outcomes', () => {
       {
         bruteName: 'TargetBrute',
         fightsCompleted: 1,
+        wins: 1,
+        losses: 0,
         finalStatus: 'manual_intervention_required',
         restingReached: false,
         levelUpDetected: true,
@@ -43,6 +47,8 @@ test('summarizeAccountRun aggregates per-brute outcomes', () => {
       {
         bruteName: 'OpponentBrute',
         fightsCompleted: 0,
+        wins: 0,
+        losses: 0,
         finalStatus: 'error',
         restingReached: false,
         levelUpDetected: false,
@@ -55,6 +61,8 @@ test('summarizeAccountRun aggregates per-brute outcomes', () => {
 
   assert.equal(summary.totalBrutesProcessed, 3);
   assert.equal(summary.totalFightsCompleted, 3);
+  assert.equal(summary.totalWins, 2);
+  assert.equal(summary.totalLosses, 1);
   assert.equal(summary.restingCount, 1);
   assert.equal(summary.manualInterventionCount, 1);
   assert.equal(summary.errorCount, 1);
@@ -68,6 +76,8 @@ test('accountRunHasFailure returns true when the roster cycle is incomplete due 
       {
         bruteName: 'ExampleBrute',
         fightsCompleted: 2,
+        wins: 2,
+        losses: 0,
         finalStatus: 'resting',
         restingReached: true,
         levelUpDetected: false,

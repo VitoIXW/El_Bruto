@@ -7,6 +7,7 @@ import {
   extractBruteNameFromUrl,
   extractHallBruteName,
   extractHomeBruteNameFromHref,
+  extractLatestCellFightOutcomeFromImageSources,
   listHallRosterBrutes,
   pickTopLeftHomeBruteEntry,
   submitLoginForm,
@@ -71,6 +72,34 @@ test('extractHallBruteName rejects descriptive and stat-like hall lines', () => 
   );
   assert.equal(
     extractHallBruteName('Sacrificar\nReiniciar\nHistorial de eventos'),
+    undefined,
+  );
+});
+
+test('extractLatestCellFightOutcomeFromImageSources reads the newest fight result from log icons', () => {
+  assert.equal(
+    extractLatestCellFightOutcomeFromImageSources([
+      '/images/log/lose.webp',
+      '/images/log/win.webp',
+      '/images/log/win.webp',
+    ]),
+    'loss',
+  );
+
+  assert.equal(
+    extractLatestCellFightOutcomeFromImageSources([
+      '/images/log/win.webp',
+      '/images/log/lose.webp',
+    ]),
+    'win',
+  );
+
+  assert.equal(
+    extractLatestCellFightOutcomeFromImageSources([
+      '/images/other/icon.webp',
+      null,
+      undefined,
+    ]),
     undefined,
   );
 });

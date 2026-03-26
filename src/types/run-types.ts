@@ -79,6 +79,8 @@ export interface FailureArtifacts {
 export interface RunSummary {
   bruteName: string;
   fightsCompleted: number;
+  wins: number;
+  losses: number;
   finalStatus: FinalStatus;
   restingReached: boolean;
   levelUpDetected: boolean;
@@ -94,6 +96,8 @@ export interface AccountRunSummary {
   failureReason?: string;
   totalBrutesProcessed: number;
   totalFightsCompleted: number;
+  totalWins: number;
+  totalLosses: number;
   restingCount: number;
   manualInterventionCount: number;
   errorCount: number;

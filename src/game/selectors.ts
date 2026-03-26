@@ -45,6 +45,10 @@ export const selectors = {
     arenaLink: 'a[href$="/arena"]',
     nextBruteControl:
       'a:has-text("Next Brute"), button:has-text("Next Brute"), a:has-text("Siguiente Bruto"), button:has-text("Siguiente Bruto"), a[aria-label="Next Brute"], button[aria-label="Next Brute"], a[aria-label="Siguiente Bruto"], button[aria-label="Siguiente Bruto"]',
+    fightLogEntries:
+      '.MuiPaper-root:has(a[href*="/fight/"]), [class*="MuiPaper" i]:has(a[href*="/fight/"])',
+    eventLogOutcomeIcons:
+      'img[src*="/images/log/win.webp"], img[src*="/images/log/lose.webp"]',
     restingText:
       'text=/rest(ing|ed)|come back later|no more fights|is resting|new fights (will be )?available tomorrow|est[aá] descansando|nuevos combates estar[aá]n disponibles ma[nñ]ana/i',
     bruteNameHeading: 'h1, h2, [data-testid="brute-name"]',

@@ -118,6 +118,8 @@ test('runAllBrutes skips bootstrap when an initial brute state is already provid
   bruteRunner.runCurrentBrute = async () => ({
     bruteName: 'TargetBrute',
     fightsCompleted: 0,
+    wins: 0,
+    losses: 0,
     finalStatus: 'resting',
     restingReached: true,
     levelUpDetected: false,
@@ -162,6 +164,8 @@ test('runAllBrutes can continue through an explicit interactive brute order with
   bruteRunner.runCurrentBrute = async () => ({
     bruteName: currentBruteName,
     fightsCompleted: 0,
+    wins: 0,
+    losses: 0,
     finalStatus: 'resting',
     restingReached: true,
     levelUpDetected: false,
