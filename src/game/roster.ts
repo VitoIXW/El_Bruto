@@ -96,6 +96,8 @@ export function summarizeAccountRun(
     failureReason,
     totalBrutesProcessed: brutes.length,
     totalFightsCompleted: brutes.reduce((total, brute) => total + brute.fightsCompleted, 0),
+    totalWins: brutes.reduce((total, brute) => total + brute.wins, 0),
+    totalLosses: brutes.reduce((total, brute) => total + brute.losses, 0),
     restingCount: brutes.filter((brute) => brute.restingReached).length,
     manualInterventionCount: brutes.filter((brute) => brute.finalStatus === 'manual_intervention_required').length,
     errorCount: brutes.filter((brute) => brute.errorsOccurred).length,

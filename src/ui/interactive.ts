@@ -3,7 +3,7 @@ import * as classicReadline from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
 
 import { normalizeText } from '../game/selectors';
-import type { ExecutionMode, LoginCredentials, SavedAccount } from '../types/run-types';
+import type { ExecutionMode, LevelUpBehavior, LoginCredentials, SavedAccount } from '../types/run-types';
 
 export interface InteractivePrompter {
   ask(question: string): Promise<string>;
@@ -71,6 +71,49 @@ export function writeInteractiveHeader(prompter: InteractivePrompter): void {
     prompter.write(line);
   });
   prompter.write('');
+}
+
+export async function promptForLevelUpBehavior(
+  prompter: InteractivePrompter,
+): Promise<LevelUpBehavior> {
+  const options = [
+    'Skip that brute and continue',
+    'Wait for me to level it up manually in Chromium',
+  ];
+
+  if (prompter.chooseOne) {
+    const choice = await prompter.chooseOne('When a brute levels up, what should happen?', options);
+    return choice === 1 ? 'wait_for_manual_resume' : 'skip_brute';
+  }
+
+  prompter.write('Level-up handling:');
+  prompter.write('1. Skip that brute and continue');
+  prompter.write('2. Wait for me to level it up manually in Chromium');
+
+  while (true) {
+    const choice = parsePositiveIndex(
+      normalizeText(await prompter.ask('Choose level-up handling: ')),
+      2,
+    );
+    if (choice === 0) {
+      return 'skip_brute';
+    }
+
+    if (choice === 1) {
+      return 'wait_for_manual_resume';
+    }
+
+    prompter.write('Choose 1 or 2.');
+  }
+}
+
+export async function waitForManualLevelUpConfirmation(
+  bruteName: string,
+  prompter: InteractivePrompter,
+): Promise<void> {
+  prompter.write(`The brute ${bruteName} leveled up.`);
+  prompter.write('Chromium will stay open so you can choose the level-up manually.');
+  await prompter.ask('Press Enter when you are done and want to continue: ');
 }
 
 export function createConsolePrompter(

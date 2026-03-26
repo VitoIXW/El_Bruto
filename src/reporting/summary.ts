@@ -23,6 +23,15 @@ function formatBoolean(value: boolean): string {
   return value ? 'yes' : 'no';
 }
 
+function formatWinRate(wins: number, losses: number): string {
+  const totalFights = wins + losses;
+  if (totalFights === 0) {
+    return 'n/a';
+  }
+
+  return `${((wins / totalFights) * 100).toFixed(1)}%`;
+}
+
 function formatFinalStatus(status: RunSummary['finalStatus']): string {
   return status.replace(/_/g, ' ');
 }
@@ -40,6 +49,9 @@ function summarizeBruteOutcome(summary: RunSummary, color: boolean | undefined):
     applyColor(color, summary.bruteName, ANSI_BOLD),
     `status=${statusLabel}`,
     `fights=${summary.fightsCompleted}`,
+    `wins=${summary.wins}`,
+    `losses=${summary.losses}`,
+    `win-rate=${formatWinRate(summary.wins, summary.losses)}`,
     `resting=${formatBoolean(summary.restingReached)}`,
     `level-up=${formatBoolean(summary.levelUpDetected)}`,
     `errors=${formatBoolean(summary.errorsOccurred)}`,
@@ -60,6 +72,9 @@ export function formatSummary(summary: RunSummary, options: SummaryFormatOptions
     `${applyColor(color, 'Brute', ANSI_BOLD)}: ${applyColor(color, summary.bruteName, ANSI_BOLD)}`,
     `${applyColor(color, 'Status', ANSI_BOLD)}: ${applyColor(color, formatFinalStatus(summary.finalStatus), ANSI_BOLD, statusTone)}`,
     `${applyColor(color, 'Fights', ANSI_BOLD)}: ${summary.fightsCompleted}`,
+    `${applyColor(color, 'Wins', ANSI_BOLD)}: ${summary.wins}`,
+    `${applyColor(color, 'Losses', ANSI_BOLD)}: ${summary.losses}`,
+    `${applyColor(color, 'Win rate', ANSI_BOLD)}: ${formatWinRate(summary.wins, summary.losses)}`,
     `${applyColor(color, 'Resting', ANSI_BOLD)}: ${formatBoolean(summary.restingReached)}`,
     `${applyColor(color, 'Level-up', ANSI_BOLD)}: ${formatBoolean(summary.levelUpDetected)}`,
     `${applyColor(color, 'Errors', ANSI_BOLD)}: ${formatBoolean(summary.errorsOccurred)}`,
@@ -92,6 +107,9 @@ export function formatAccountSummary(summary: AccountRunSummary, options: Summar
     `${applyColor(color, 'Started brute', ANSI_BOLD)}: ${summary.startedBruteName}`,
     `${applyColor(color, 'Brutes processed', ANSI_BOLD)}: ${summary.totalBrutesProcessed}`,
     `${applyColor(color, 'Total fights', ANSI_BOLD)}: ${summary.totalFightsCompleted}`,
+    `${applyColor(color, 'Total wins', ANSI_BOLD)}: ${summary.totalWins}`,
+    `${applyColor(color, 'Total losses', ANSI_BOLD)}: ${summary.totalLosses}`,
+    `${applyColor(color, 'Win rate', ANSI_BOLD)}: ${formatWinRate(summary.totalWins, summary.totalLosses)}`,
     `${applyColor(color, 'Resting', ANSI_BOLD)}: ${summary.restingCount}`,
     `${applyColor(color, 'Manual intervention', ANSI_BOLD)}: ${summary.manualInterventionCount}`,
     `${applyColor(color, 'Errors', ANSI_BOLD)}: ${summary.errorCount}`,

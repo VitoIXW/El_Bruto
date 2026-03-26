@@ -12,7 +12,9 @@ import { bootstrapToAuthenticatedHome, continueToConfiguredBrute } from './game/
 import {
   createConsolePrompter,
   promptForAccountSelection,
+  promptForLevelUpBehavior,
   promptForRunSelection,
+  waitForManualLevelUpConfirmation,
   writeInteractiveHeader,
 } from './ui/interactive';
 import type { RunConfig, RunSummary } from './types/run-types';
@@ -63,11 +65,23 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
       logger.info('Authenticated home detected. Opening /hall to discover account brutes.');
       const bruteNames = await listHallRosterBrutes(page, interactiveConfig.bootstrapUrl, logger);
       const selection = await promptForRunSelection(bruteNames, prompter);
+      const levelUpBehavior = interactiveConfig.headless
+        ? 'skip_brute'
+        : await promptForLevelUpBehavior(prompter);
       prompter.clearScreen?.();
+
+      const executionConfig: RunConfig = {
+        ...interactiveConfig,
+        interactiveLevelUpBehavior: levelUpBehavior,
+        onInteractiveLevelUpReady:
+          !interactiveConfig.headless && levelUpBehavior === 'wait_for_manual_resume'
+            ? async (bruteName: string) => waitForManualLevelUpConfirmation(bruteName, prompter)
+            : undefined,
+      };
 
       if (selection.executionMode === 'all-brutes') {
         const firstBruteName = selection.bruteNames[0];
-        const allBrutesConfig = buildAllBrutesRunConfig(interactiveConfig, firstBruteName);
+        const allBrutesConfig = buildAllBrutesRunConfig(executionConfig, firstBruteName);
         logger.info(`Continuing interactive all-brutes cycle directly from ${allBrutesConfig.targetUrl}.`);
         const state = await continueToConfiguredBrute(page, allBrutesConfig, logger);
         const summary = await runAllBrutes(page, allBrutesConfig, logger, state, selection.bruteNames);
@@ -78,7 +92,7 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
 
       const summaries: RunSummary[] = [];
       for (const bruteName of selection.bruteNames) {
-        const bruteConfig = buildBruteRunConfig(interactiveConfig, bruteName);
+        const bruteConfig = buildBruteRunConfig(executionConfig, bruteName);
         logger.info(`Continuing interactive selection directly to ${bruteConfig.targetUrl}.`);
         const state = await continueToConfiguredBrute(page, bruteConfig, logger);
         const summary = await runCurrentBrute(page, bruteConfig, logger, state);

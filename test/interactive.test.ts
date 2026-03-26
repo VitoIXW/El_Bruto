@@ -4,7 +4,9 @@ import assert from 'node:assert/strict';
 import {
   parseMultiSelection,
   promptForAccountSelection,
+  promptForLevelUpBehavior,
   promptForRunSelection,
+  waitForManualLevelUpConfirmation,
   writeInteractiveHeader,
   type InteractivePrompter,
 } from '../src/ui/interactive';
@@ -198,6 +200,41 @@ test('promptForRunSelection supports arrow-style multi brute selection', async (
     executionMode: 'single',
     bruteNames: ['ExampleBrute', 'OpponentBrute'],
   });
+});
+
+test('promptForLevelUpBehavior supports textual selection', async () => {
+  const { prompter, writes } = createPrompter(['2']);
+
+  const result = await promptForLevelUpBehavior(prompter);
+
+  assert.equal(result, 'wait_for_manual_resume');
+  assert.deepEqual(writes.slice(0, 3), [
+    'Level-up handling:',
+    '1. Skip that brute and continue',
+    '2. Wait for me to level it up manually in Chromium',
+  ]);
+});
+
+test('promptForLevelUpBehavior supports arrow-style selection', async () => {
+  const { prompter } = createSelectablePrompter([1]);
+
+  const result = await promptForLevelUpBehavior(prompter);
+
+  assert.equal(result, 'wait_for_manual_resume');
+});
+
+test('waitForManualLevelUpConfirmation pauses for terminal confirmation', async () => {
+  const { prompter, prompts, writes } = createPrompter(['']);
+
+  await waitForManualLevelUpConfirmation('ExampleBrute', prompter);
+
+  assert.deepEqual(writes, [
+    'The brute ExampleBrute leveled up.',
+    'Chromium will stay open so you can choose the level-up manually.',
+  ]);
+  assert.deepEqual(prompts, [
+    'Press Enter when you are done and want to continue: ',
+  ]);
 });
 
 test('parseMultiSelection keeps valid unique brute selections in input order', () => {

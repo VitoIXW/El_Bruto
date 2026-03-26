@@ -7,6 +7,8 @@ test('formatSummary includes artifact paths when present', () => {
   const text = formatSummary({
     bruteName: 'ExampleBrute',
     fightsCompleted: 2,
+    wins: 1,
+    losses: 1,
     finalStatus: 'resting',
     restingReached: true,
     levelUpDetected: false,
@@ -19,6 +21,9 @@ test('formatSummary includes artifact paths when present', () => {
 
   assert.match(text, /Brute: ExampleBrute/);
   assert.match(text, /Status: resting/);
+  assert.match(text, /Wins: 1/);
+  assert.match(text, /Losses: 1/);
+  assert.match(text, /Win rate: 50.0%/);
   assert.match(text, /Screenshot: artifacts\/example\.png/);
   assert.match(text, /HTML snapshot: artifacts\/example\.html/);
 });
@@ -27,6 +32,8 @@ test('formatSummary makes level-up manual intervention explicit', () => {
   const text = formatSummary({
     bruteName: 'ExampleBrute',
     fightsCompleted: 4,
+    wins: 3,
+    losses: 1,
     finalStatus: 'manual_intervention_required',
     restingReached: false,
     levelUpDetected: true,
@@ -49,6 +56,8 @@ test('formatAccountSummary includes aggregate counts and per-brute results', () 
     advanceFailed: false,
     totalBrutesProcessed: 2,
     totalFightsCompleted: 5,
+    totalWins: 3,
+    totalLosses: 2,
     restingCount: 1,
     manualInterventionCount: 1,
     errorCount: 0,
@@ -56,6 +65,8 @@ test('formatAccountSummary includes aggregate counts and per-brute results', () 
       {
         bruteName: 'ExampleBrute',
         fightsCompleted: 3,
+        wins: 2,
+        losses: 1,
         finalStatus: 'resting',
         restingReached: true,
         levelUpDetected: false,
@@ -64,6 +75,8 @@ test('formatAccountSummary includes aggregate counts and per-brute results', () 
       {
         bruteName: 'TargetBrute',
         fightsCompleted: 2,
+        wins: 1,
+        losses: 1,
         finalStatus: 'manual_intervention_required',
         restingReached: false,
         levelUpDetected: true,
@@ -76,9 +89,12 @@ test('formatAccountSummary includes aggregate counts and per-brute results', () 
   assert.match(text, /Outcome: COMPLETE/);
   assert.match(text, /Brutes processed: 2/);
   assert.match(text, /Total fights: 5/);
+  assert.match(text, /Total wins: 3/);
+  assert.match(text, /Total losses: 2/);
+  assert.match(text, /Win rate: 60.0%/);
   assert.match(text, /Manual intervention: 1/);
-  assert.match(text, /- ExampleBrute \| status=resting \| fights=3/);
-  assert.match(text, /- TargetBrute \| status=manual intervention required \| fights=2/);
+  assert.match(text, /- ExampleBrute \| status=resting \| fights=3 \| wins=2 \| losses=1 \| win-rate=66.7%/);
+  assert.match(text, /- TargetBrute \| status=manual intervention required \| fights=2 \| wins=1 \| losses=1 \| win-rate=50.0%/);
 });
 
 test('formatAccountSummary makes incomplete-cycle advance failure explicit', () => {
@@ -90,6 +106,8 @@ test('formatAccountSummary makes incomplete-cycle advance failure explicit', () 
     failureReason: 'Unable to advance to the next brute after ExampleBrute: missing next-brute control',
     totalBrutesProcessed: 1,
     totalFightsCompleted: 3,
+    totalWins: 2,
+    totalLosses: 1,
     restingCount: 1,
     manualInterventionCount: 0,
     errorCount: 0,
@@ -97,6 +115,8 @@ test('formatAccountSummary makes incomplete-cycle advance failure explicit', () 
       {
         bruteName: 'ExampleBrute',
         fightsCompleted: 3,
+        wins: 2,
+        losses: 1,
         finalStatus: 'resting',
         restingReached: true,
         levelUpDetected: false,

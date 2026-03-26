@@ -92,6 +92,8 @@ interface HallContainerScan {
   selected?: HallContainerInspection;
 }
 
+export type FightOutcome = 'win' | 'loss';
+
 function logHallDiscovery(logger: Logger | undefined, message: string): void {
   logger?.info(`[hall] ${message}`);
 }
@@ -132,6 +134,26 @@ function isLikelyHallBruteName(line: string): boolean {
 
 function dedupeBruteNames(bruteNames: Array<string | undefined>): string[] {
   return Array.from(new Set(bruteNames.map((name) => normalizeText(name)).filter(Boolean)));
+}
+
+export function extractLatestCellFightOutcomeFromImageSources(
+  imageSources: Array<string | null | undefined>,
+): FightOutcome | undefined {
+  for (const source of imageSources) {
+    if (typeof source !== 'string') {
+      continue;
+    }
+
+    if (source.includes('/images/log/win.webp')) {
+      return 'win';
+    }
+
+    if (source.includes('/images/log/lose.webp')) {
+      return 'loss';
+    }
+  }
+
+  return undefined;
 }
 
 export function extractHomeBruteNameFromHref(href: string | null | undefined): string | undefined {
@@ -182,6 +204,51 @@ export async function extractBruteName(page: Page): Promise<string | undefined> 
 
 export async function clickArena(page: Page): Promise<void> {
   await page.locator(selectors.cell.arenaLink).first().click();
+}
+
+export async function readLatestCellFightOutcome(
+  page: Page,
+  timeoutMs = 2000,
+): Promise<FightOutcome | undefined> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const fightLogEntries = page.locator(selectors.cell.fightLogEntries);
+    if (await fightLogEntries.count()) {
+      const latestFightEntry = fightLogEntries.first();
+      const latestFightIcons = latestFightEntry.locator(selectors.cell.eventLogOutcomeIcons);
+      const latestFightIconCount = await latestFightIcons.count();
+      const latestFightSources: Array<string | null> = [];
+
+      for (let index = 0; index < latestFightIconCount; index += 1) {
+        latestFightSources.push(await latestFightIcons.nth(index).getAttribute('src').catch(() => null));
+      }
+
+      const latestFightOutcome = extractLatestCellFightOutcomeFromImageSources(latestFightSources);
+      if (latestFightOutcome) {
+        return latestFightOutcome;
+      }
+    }
+
+    const outcomeIcons = page.locator(selectors.cell.eventLogOutcomeIcons);
+    const iconCount = await outcomeIcons.count();
+    if (iconCount > 0) {
+      const imageSources: Array<string | null> = [];
+
+      for (let index = 0; index < iconCount; index += 1) {
+        imageSources.push(await outcomeIcons.nth(index).getAttribute('src').catch(() => null));
+      }
+
+      const fallbackOutcome = extractLatestCellFightOutcomeFromImageSources(imageSources);
+      if (fallbackOutcome) {
+        return fallbackOutcome;
+      }
+    }
+
+    await page.waitForTimeout(100);
+  }
+
+  return undefined;
 }
 
 export async function clickPublicLogin(page: Page): Promise<void> {
