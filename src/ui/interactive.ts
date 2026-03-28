@@ -3,7 +3,13 @@ import * as classicReadline from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
 
 import { normalizeText } from '../game/selectors';
-import type { ExecutionMode, LevelUpBehavior, LoginCredentials, SavedAccount } from '../types/run-types';
+import type {
+  ExecutionMode,
+  InteractiveCompletionBehavior,
+  LevelUpBehavior,
+  LoginCredentials,
+  SavedAccount,
+} from '../types/run-types';
 
 export interface InteractivePrompter {
   ask(question: string): Promise<string>;
@@ -45,6 +51,7 @@ interface TtyLikeOutput extends Writable {
 
 const ANSI_RESET = '\u001B[0m';
 const ANSI_ACTIVE_BLUE = '\u001B[38;5;39m';
+const ANSI_ACTIVE_YELLOW = '\u001B[38;5;226m';
 const ANSI_DIM = '\u001B[2m';
 const ANSI_CLEAR_SCREEN = '\u001B[2J\u001B[3J\u001B[H';
 
@@ -107,6 +114,40 @@ export async function promptForLevelUpBehavior(
   }
 }
 
+export async function promptForInteractiveCompletionBehavior(
+  prompter: InteractivePrompter,
+): Promise<InteractiveCompletionBehavior> {
+  const options = [
+    'Close the program and Chromium when the run finishes',
+    'Keep Chromium open when the run finishes',
+  ];
+
+  if (prompter.chooseOne) {
+    const choice = await prompter.chooseOne('What should happen when the run finishes?', options);
+    return choice === 1 ? 'keep_browser_open' : 'close_program';
+  }
+
+  prompter.write('Run completion handling:');
+  prompter.write('1. Close the program and Chromium when the run finishes');
+  prompter.write('2. Keep Chromium open when the run finishes');
+
+  while (true) {
+    const choice = parsePositiveIndex(
+      normalizeText(await prompter.ask('Choose completion handling: ')),
+      2,
+    );
+    if (choice === 0) {
+      return 'close_program';
+    }
+
+    if (choice === 1) {
+      return 'keep_browser_open';
+    }
+
+    prompter.write('Choose 1 or 2.');
+  }
+}
+
 export async function waitForManualLevelUpConfirmation(
   bruteName: string,
   prompter: InteractivePrompter,
@@ -114,6 +155,17 @@ export async function waitForManualLevelUpConfirmation(
   prompter.write(`The brute ${bruteName} leveled up.`);
   prompter.write('Chromium will stay open so you can choose the level-up manually.');
   await prompter.ask('Press Enter when you are done and want to continue: ');
+}
+
+export async function waitForInteractiveCompletionConfirmation(
+  prompter: InteractivePrompter,
+): Promise<void> {
+  prompter.write('');
+  prompter.write(`${ANSI_ACTIVE_BLUE}================ RUN FINISHED ================${ANSI_RESET}`);
+  prompter.write('Chromium will stay open so you can manage anything else while still logged in.');
+  await prompter.ask(
+    `Press ${ANSI_ACTIVE_YELLOW}ENTER${ANSI_RESET} when you want to close Chromium and exit: `,
+  );
 }
 
 export function createConsolePrompter(

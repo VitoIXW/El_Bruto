@@ -12,8 +12,10 @@ import { bootstrapToAuthenticatedHome, continueToConfiguredBrute } from './game/
 import {
   createConsolePrompter,
   promptForAccountSelection,
+  promptForInteractiveCompletionBehavior,
   promptForLevelUpBehavior,
   promptForRunSelection,
+  waitForInteractiveCompletionConfirmation,
   waitForManualLevelUpConfirmation,
   writeInteractiveHeader,
 } from './ui/interactive';
@@ -68,11 +70,15 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
       const levelUpBehavior = interactiveConfig.headless
         ? 'skip_brute'
         : await promptForLevelUpBehavior(prompter);
+      const completionBehavior = interactiveConfig.headless
+        ? 'close_program'
+        : await promptForInteractiveCompletionBehavior(prompter);
       prompter.clearScreen?.();
 
       const executionConfig: RunConfig = {
         ...interactiveConfig,
         interactiveLevelUpBehavior: levelUpBehavior,
+        interactiveCompletionBehavior: completionBehavior,
         onInteractiveLevelUpReady:
           !interactiveConfig.headless && levelUpBehavior === 'wait_for_manual_resume'
             ? async (bruteName: string) => waitForManualLevelUpConfirmation(bruteName, prompter)
@@ -87,20 +93,23 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
         const summary = await runAllBrutes(page, allBrutesConfig, logger, state, selection.bruteNames);
         logger.info(formatAccountSummary(summary, { color: logger.supportsColor }));
         process.exitCode = accountRunHasFailure(summary) ? 1 : 0;
-        return;
+      } else {
+        const summaries: RunSummary[] = [];
+        for (const bruteName of selection.bruteNames) {
+          const bruteConfig = buildBruteRunConfig(executionConfig, bruteName);
+          logger.info(`Continuing interactive selection directly to ${bruteConfig.targetUrl}.`);
+          const state = await continueToConfiguredBrute(page, bruteConfig, logger);
+          const summary = await runCurrentBrute(page, bruteConfig, logger, state);
+          summaries.push(summary);
+          logger.info(formatSummary(summary, { color: logger.supportsColor }));
+        }
+
+        process.exitCode = summaries.some((summary) => summary.errorsOccurred) ? 1 : 0;
       }
 
-      const summaries: RunSummary[] = [];
-      for (const bruteName of selection.bruteNames) {
-        const bruteConfig = buildBruteRunConfig(executionConfig, bruteName);
-        logger.info(`Continuing interactive selection directly to ${bruteConfig.targetUrl}.`);
-        const state = await continueToConfiguredBrute(page, bruteConfig, logger);
-        const summary = await runCurrentBrute(page, bruteConfig, logger, state);
-        summaries.push(summary);
-        logger.info(formatSummary(summary, { color: logger.supportsColor }));
+      if (completionBehavior === 'keep_browser_open') {
+        await waitForInteractiveCompletionConfirmation(prompter);
       }
-
-      process.exitCode = summaries.some((summary) => summary.errorsOccurred) ? 1 : 0;
     } finally {
       await context.close();
     }
