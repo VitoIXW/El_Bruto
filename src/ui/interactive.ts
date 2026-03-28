@@ -45,6 +45,8 @@ interface TtyLikeOutput extends Writable {
 
 const ANSI_RESET = '\u001B[0m';
 const ANSI_ACTIVE_BLUE = '\u001B[38;5;39m';
+const ANSI_ACTIVE_YELLOW = '\u001B[33m';
+const ANSI_BOLD = '\u001B[1m';
 const ANSI_DIM = '\u001B[2m';
 const ANSI_CLEAR_SCREEN = '\u001B[2J\u001B[3J\u001B[H';
 
@@ -111,9 +113,17 @@ export async function waitForManualLevelUpConfirmation(
   bruteName: string,
   prompter: InteractivePrompter,
 ): Promise<void> {
-  prompter.write(`The brute ${bruteName} leveled up.`);
+  const levelUpLabel = `${ANSI_BOLD}${ANSI_ACTIVE_YELLOW}LEVEL UP${ANSI_RESET}`;
+  const enterLabel = `${ANSI_BOLD}${ANSI_ACTIVE_BLUE}ENTER${ANSI_RESET}`;
+
+  prompter.write('');
+  prompter.write('========================================');
+  prompter.write(`${levelUpLabel} for ${bruteName}`);
   prompter.write('Chromium will stay open so you can choose the level-up manually.');
-  await prompter.ask('Press Enter when you are done and want to continue: ');
+  prompter.write(`When you are done, come back here and press ${enterLabel} to continue.`);
+  prompter.write('========================================');
+  prompter.write('');
+  await prompter.ask(`Press ${enterLabel} when you are done and want to continue: `);
 }
 
 export function createConsolePrompter(
