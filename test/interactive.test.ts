@@ -4,8 +4,10 @@ import assert from 'node:assert/strict';
 import {
   parseMultiSelection,
   promptForAccountSelection,
+  promptForBruteSelection,
   promptForInteractiveCompletionBehavior,
   promptForLevelUpBehavior,
+  promptForRunModeChoice,
   promptForRunSelection,
   waitForInteractiveCompletionConfirmation,
   waitForManualLevelUpConfirmation,
@@ -136,6 +138,44 @@ test('promptForRunSelection supports selected multiple brutes', async () => {
   assert.match(writes[4] ?? '', /Available brutes for multi-selection:/);
 });
 
+test('promptForRunModeChoice supports textual selection', async () => {
+  const { prompter, writes } = createPrompter(['3']);
+
+  const result = await promptForRunModeChoice(prompter);
+
+  assert.equal(result, 'selected-brutes');
+  assert.deepEqual(writes.slice(0, 4), [
+    'Run mode:',
+    '1. Run all brutes',
+    '2. Run one brute',
+    '3. Run selected brutes',
+  ]);
+});
+
+test('promptForRunModeChoice supports arrow-style selection', async () => {
+  const { prompter } = createSelectablePrompter([1]);
+
+  const result = await promptForRunModeChoice(prompter);
+
+  assert.equal(result, 'one-brute');
+});
+
+test('promptForBruteSelection supports single textual selection after mode choice', async () => {
+  const { prompter, writes } = createPrompter(['2']);
+
+  const result = await promptForBruteSelection(
+    ['ExampleBrute', 'TargetBrute', 'OpponentBrute'],
+    prompter,
+    'one-brute',
+  );
+
+  assert.deepEqual(result, {
+    executionMode: 'single',
+    bruteNames: ['TargetBrute'],
+  });
+  assert.match(writes[0] ?? '', /Available brutes for single selection:/);
+});
+
 test('promptForRunSelection only shows brute numbering after choosing single-brute mode', async () => {
   const { prompter, writes } = createPrompter(['2', '2']);
 
@@ -200,6 +240,21 @@ test('promptForRunSelection supports arrow-style multi brute selection', async (
   const result = await promptForRunSelection(
     ['ExampleBrute', 'TargetBrute', 'OpponentBrute'],
     prompter,
+  );
+
+  assert.deepEqual(result, {
+    executionMode: 'single',
+    bruteNames: ['ExampleBrute', 'OpponentBrute'],
+  });
+});
+
+test('promptForBruteSelection supports arrow-style multi brute selection after mode choice', async () => {
+  const { prompter } = createSelectablePrompter([], [[0, 2]]);
+
+  const result = await promptForBruteSelection(
+    ['ExampleBrute', 'TargetBrute', 'OpponentBrute'],
+    prompter,
+    'selected-brutes',
   );
 
   assert.deepEqual(result, {
