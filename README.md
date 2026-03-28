@@ -1,169 +1,181 @@
 # El Bruto Arena Runner
 
-[Español](README.es.md) | English
+Guía de uso del CLI para automatizar combates de **El Bruto / La Brute** en EternalTwin.
 
-TypeScript + Playwright CLI for automating **La Brute / El Bruto** fights on EternalTwin.
+## Requisitos
 
-The project currently supports two ways of running:
-
-- **automatic mode**, intended for terminal commands, scripts, or cron
-- **interactive mode**, intended for a guided console flow where you choose the account, brutes, and run mode
-
-## What It Does
-
-The runner can currently:
-
-- log in to EternalTwin automatically
-- use locally stored accounts that stay on your machine
-- discover an account's brute roster from `/hall`
-- run:
-  - a single brute
-  - several selected brutes
-  - all brutes in the account
-- go directly to the selected brute's `/cell`
-- fight until the brute is resting or a safe stop is reached
-- move through the roster with `Next Brute` in `all-brutes` mode
-- choose arena opponents using the lowest public `Win Rate` / `Ratio de Victoria` when that data can be resolved
-- save detailed logs and error artifacts for debugging
-
-## Requirements
-
-- Node.js 20+
+- Node.js 20 o superior
 - npm
-- Playwright Chromium
+- Chromium de Playwright
 
-## Installation
+## Instalación
 
 ```bash
 npm install
 npx playwright install chromium
 ```
 
-## How Accounts Are Stored
+## Uso En Windows
 
-The main and recommended approach is:
+Funciona también en Windows. Lo recomendable es usar `PowerShell` o `Windows Terminal`.
 
-- `/.accounts.local.json`
+Instalación:
 
-Format:
-
-```json
-{
-  "accounts": [
-    {
-      "label": "Main account",
-      "username": "my_username",
-      "password": "my_password"
-    },
-    {
-      "label": "Secondary account",
-      "username": "other_username",
-      "password": "other_password"
-    }
-  ]
-}
+```powershell
+npm install
+npx playwright install chromium
 ```
 
-Notes:
+Modo interactivo:
 
-- `/.accounts.local.json` is gitignored
-- the label is what you see in interactive mode and what you can also use with `--account`
-- if you only have one saved account, automatic mode can use it without asking
-- if you have several saved accounts, automatic mode should be given `--account`
-
-Current credential priority:
-
-1. `ET_USERNAME` + `ET_PASSWORD`
-2. saved account in `/.accounts.local.json`
-
-## Quick Start
-
-During development you can run the source directly:
-
-```bash
-npm run dev
-```
-
-If you prefer using the compiled version:
-
-```bash
-npm run build
+```powershell
 npm run start
 ```
 
-## Interactive Mode
+Modo automático:
 
-If you run without arguments:
+```powershell
+npm run start -- --mode all-brutes --headless
+```
+
+Con credenciales por variables de entorno en PowerShell:
+
+```powershell
+$env:ET_USERNAME="tu_usuario"
+$env:ET_PASSWORD="tu_password"
+npm run start -- --mode single --brute TuBruto --headless
+```
+
+Si prefieres `cmd.exe`:
+
+```cmd
+set ET_USERNAME=tu_usuario
+set ET_PASSWORD=tu_password
+npm run start -- --mode single --brute TuBruto --headless
+```
+
+## Primer Arranque
+
+Modo interactivo:
 
 ```bash
 npm run start
 ```
 
-the app enters interactive mode.
-
-You can also force it with:
+También puedes forzarlo con:
 
 ```bash
 npm run start -- --interactive
 ```
 
-or:
+o:
 
 ```bash
 npm run start -- --manual
 ```
 
-### What Interactive Mode Does
+## Cuentas Guardadas
 
-1. lets you choose a saved account or enter a new one
-2. if you enter a new account, it asks whether you want to save it
-3. logs in
-4. opens `/hall`
-5. discovers the account's brutes
-6. lets you choose between:
-   - all brutes
-   - one brute
-   - several selected brutes
+Las cuentas se guardan en:
 
-## Automatic Mode
+- `.accounts.local.json`
 
-Automatic mode is intended for non-interactive runs.
+Ejemplo:
 
-### Run All Brutes
+```json
+{
+  "accounts": [
+    {
+      "label": "Cuenta principal",
+      "username": "mi_usuario",
+      "password": "mi_password"
+    }
+  ]
+}
+```
 
-With a single saved account:
+Notas:
+
+- ese archivo está ignorado por Git
+- el `label` es el que puedes usar con `--account`
+- si no hay cuentas guardadas, el modo interactivo te deja introducir una nueva
+
+## Credenciales
+
+Orden habitual:
+
+1. `ET_USERNAME` + `ET_PASSWORD`
+2. cuenta guardada en `.accounts.local.json`
+
+## Modos De Ejecución
+
+### Modo interactivo
+
+Te deja:
+
+- elegir cuenta
+- descubrir brutos del `/hall`
+- ejecutar:
+  - todos los brutos
+  - un bruto
+  - varios brutos seleccionados
+- decidir qué hacer cuando un bruto sube de nivel si Chromium está visible:
+  - saltarlo y seguir
+  - dejar Chromium abierto, subirlo manualmente y continuar al pulsar Enter
+
+### Modo automático
+
+Pensado para lanzar por terminal, script o tarea programada.
+
+En `headless`, si un bruto sube de nivel se salta y la ejecución sigue.
+
+## Comandos Más Usados
+
+### Ejecutar todos los brutos
+
+Con una cuenta guardada:
 
 ```bash
 npm run start -- --mode all-brutes --headless
 ```
 
-With a specific saved account:
+Con una cuenta concreta:
 
 ```bash
-npm run start -- --mode all-brutes --account "Main account" --headless
+npm run start -- --mode all-brutes --account "Cuenta principal" --headless
 ```
 
-With environment variables:
+Con variables de entorno:
 
 ```bash
-ET_USERNAME="my_username" ET_PASSWORD="my_password" npm run start -- --mode all-brutes --headless
+ET_USERNAME="tu_usuario" ET_PASSWORD="tu_password" npm run start -- --mode all-brutes --headless
 ```
 
-### Run One Brute
-
-In automatic mode, `single` requires an explicit brute:
+### Ejecutar un solo bruto
 
 ```bash
-npm run start -- --mode single --brute ExampleBrute --account "Main account" --headless
+npm run start -- --mode single --brute TuBruto --account "Cuenta principal" --headless
 ```
 
-or with environment variables:
+o:
 
 ```bash
-ET_USERNAME="my_username" ET_PASSWORD="my_password" npm run start -- --mode single --brute ExampleBrute --headless
+ET_USERNAME="tu_usuario" ET_PASSWORD="tu_password" npm run start -- --mode single --brute TuBruto --headless
 ```
 
-## Main Options
+### Ejecutar con Chromium visible
+
+```bash
+npm run start -- --mode single --brute TuBruto --account "Cuenta principal"
+```
+
+### Ejecutar desde TypeScript sin compilar
+
+```bash
+npm run dev
+```
+
+## Opciones
 
 - `--mode single|all-brutes`
 - `--brute <name>`
@@ -178,66 +190,49 @@ ET_USERNAME="my_username" ET_PASSWORD="my_password" npm run start -- --mode sing
 - `--login-timeout-ms <ms>`
 - `--url <url>`
 
-### Useful Notes
+## Perfiles
 
-- automatic `single` requires `--brute`
-- if you have multiple saved accounts, automatic mode should usually use `--account`
-- `--debug` mainly affects console verbosity
-- the log file still keeps rich detail even without `--debug`
-
-## Browser Profiles
-
-The runner uses a persistent Playwright profile.
-
-If you switch between multiple accounts, it is recommended to use separate profiles:
+Si usas varias cuentas, conviene separar perfiles:
 
 ```bash
-npm run start -- --mode single --brute ExampleBrute --account "Main account" --profile-dir playwright-profile-main
+npm run start -- --mode single --brute TuBruto --account "Cuenta principal" --profile-dir playwright-profile-main
 ```
 
 ```bash
-npm run start -- --mode single --brute ExampleBrute --account "Secondary account" --profile-dir playwright-profile-alt
+npm run start -- --mode single --brute OtroBruto --account "Cuenta secundaria" --profile-dir playwright-profile-alt
 ```
 
-This helps avoid mixing cookies or session state between accounts.
+## Logs Y Artefactos
 
-## Logs And Artifacts
-
-Logs are stored in:
+Los logs se guardan en:
 
 - `logs/`
 
-Error artifacts are stored in:
+Los artefactos de error se guardan en:
 
 - `artifacts/`
 
-When something fails, you will usually get:
+Cuando algo falla normalmente tendrás:
 
-- a `.log`
-- a `.png` screenshot
-- an `.html` snapshot
+- un `.log`
+- una captura `.png`
+- un volcado `.html`
 
-## Real Runner Flow
+## Sumarios
 
-In practical terms, the current flow is:
+Al final de la ejecución se muestra:
 
-1. open EternalTwin
-2. log in if needed
-3. stabilize the account
-4. discover brutes from `/hall` when selection is needed
-5. open the corresponding brute `/cell`
-6. go to arena
-7. choose an opponent
-8. repeat until the brute is resting or the selected run mode is finished
+- número de combates
+- victorias
+- derrotas
+- porcentaje de victoria
+- si quedó descansando
+- si subió de nivel
+- si hubo errores
 
-## Known Limitations
+En ejecuciones de cuenta también se muestran los totales agregados.
 
-- the project depends on the real HTML served by EternalTwin
-- UI changes may require selector or parser adjustments
-- opponent choice depends on public win-rate data being resolvable correctly
-- manual decisions such as level-up choices are still out of scope
-
-## Development Commands
+## Comandos De Desarrollo
 
 ```bash
 npm run build
