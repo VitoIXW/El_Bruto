@@ -5,6 +5,7 @@ import { launchPersistentSession } from './browser/session';
 import { accountRunHasFailure } from './game/roster';
 import { createLogger } from './reporting/logger';
 import { formatAccountSummary, formatSummary } from './reporting/summary';
+import { registerGracefulShutdown } from './shutdown';
 import { runAllBrutes } from './game/account-runner';
 import { runBrute, runCurrentBrute } from './game/brute-runner';
 import { listHallRosterBrutes } from './game/navigation';
@@ -61,6 +62,10 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
     };
 
     const { context, page } = await launchPersistentSession(interactiveConfig);
+    const unregisterShutdown = registerGracefulShutdown(async () => {
+      await prompter.close();
+      await context.close();
+    }, logger);
 
     try {
       await bootstrapToAuthenticatedHome(page, interactiveConfig, logger);
@@ -111,6 +116,7 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
         await waitForInteractiveCompletionConfirmation(prompter);
       }
     } finally {
+      unregisterShutdown();
       await context.close();
     }
   } finally {
@@ -130,6 +136,9 @@ async function main(): Promise<void> {
   }
 
   const { context, page } = await launchPersistentSession(config);
+  const unregisterShutdown = registerGracefulShutdown(async () => {
+    await context.close();
+  }, logger);
 
   try {
     if (config.executionMode === 'all-brutes') {
@@ -143,6 +152,7 @@ async function main(): Promise<void> {
     logger.info(formatSummary(summary, { color: logger.supportsColor }));
     process.exitCode = summary.errorsOccurred ? 1 : 0;
   } finally {
+    unregisterShutdown();
     await context.close();
   }
 }
