@@ -3,7 +3,13 @@ import * as classicReadline from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
 
 import { normalizeText } from '../game/selectors';
-import type { ExecutionMode, LevelUpBehavior, LoginCredentials, SavedAccount } from '../types/run-types';
+import type {
+  ExecutionMode,
+  InteractiveCompletionBehavior,
+  LevelUpBehavior,
+  LoginCredentials,
+  SavedAccount,
+} from '../types/run-types';
 
 export interface InteractivePrompter {
   ask(question: string): Promise<string>;
@@ -23,6 +29,8 @@ export interface InteractiveRunSelection {
   executionMode: ExecutionMode;
   bruteNames: string[];
 }
+
+export type InteractiveRunModeChoice = 'all-brutes' | 'one-brute' | 'selected-brutes';
 
 const INTERACTIVE_HEADER_LINES = [
   '███████╗██╗         ██████╗ ██████╗ ██╗   ██╗████████╗ ██████╗ ',
@@ -45,8 +53,8 @@ interface TtyLikeOutput extends Writable {
 
 const ANSI_RESET = '\u001B[0m';
 const ANSI_ACTIVE_BLUE = '\u001B[38;5;39m';
-const ANSI_ACTIVE_YELLOW = '\u001B[33m';
 const ANSI_BOLD = '\u001B[1m';
+const ANSI_ACTIVE_YELLOW = '\u001B[38;5;226m';
 const ANSI_DIM = '\u001B[2m';
 const ANSI_CLEAR_SCREEN = '\u001B[2J\u001B[3J\u001B[H';
 
@@ -109,6 +117,89 @@ export async function promptForLevelUpBehavior(
   }
 }
 
+export async function promptForInteractiveCompletionBehavior(
+  prompter: InteractivePrompter,
+): Promise<InteractiveCompletionBehavior> {
+  const options = [
+    'Close the program and Chromium when the run finishes',
+    'Keep Chromium open when the run finishes',
+  ];
+
+  if (prompter.chooseOne) {
+    const choice = await prompter.chooseOne('What should happen when the run finishes?', options);
+    return choice === 1 ? 'keep_browser_open' : 'close_program';
+  }
+
+  prompter.write('Run completion handling:');
+  prompter.write('1. Close the program and Chromium when the run finishes');
+  prompter.write('2. Keep Chromium open when the run finishes');
+
+  while (true) {
+    const choice = parsePositiveIndex(
+      normalizeText(await prompter.ask('Choose completion handling: ')),
+      2,
+    );
+    if (choice === 0) {
+      return 'close_program';
+    }
+
+    if (choice === 1) {
+      return 'keep_browser_open';
+    }
+
+    prompter.write('Choose 1 or 2.');
+  }
+}
+
+export async function promptForRunModeChoice(
+  prompter: InteractivePrompter,
+): Promise<InteractiveRunModeChoice> {
+  const options = [
+    'Run all brutes',
+    'Run one brute',
+    'Run selected brutes',
+  ];
+
+  if (prompter.chooseOne) {
+    const choice = await prompter.chooseOne('Choose how to run this account:', options);
+    if (choice === 0) {
+      return 'all-brutes';
+    }
+
+    if (choice === 1) {
+      return 'one-brute';
+    }
+
+    return 'selected-brutes';
+  }
+
+  prompter.write('Run mode:');
+  prompter.write('1. Run all brutes');
+  prompter.write('2. Run one brute');
+  prompter.write('3. Run selected brutes');
+
+  while (true) {
+    const modeChoice = parsePositiveIndex(
+      normalizeText(await prompter.ask('Choose how to run this account: ')),
+      3,
+    );
+    if (modeChoice === undefined) {
+      prompter.write('Choose 1, 2, or 3.');
+      continue;
+    }
+
+    if (modeChoice === 0) {
+      return 'all-brutes';
+    }
+
+    if (modeChoice === 1) {
+      return 'one-brute';
+    }
+
+    return 'selected-brutes';
+  }
+}
+
 export async function waitForManualLevelUpConfirmation(
   bruteName: string,
   prompter: InteractivePrompter,
@@ -124,6 +215,17 @@ export async function waitForManualLevelUpConfirmation(
   prompter.write('========================================');
   prompter.write('');
   await prompter.ask(`Press ${enterLabel} when you are done and want to continue: `);
+}
+
+export async function waitForInteractiveCompletionConfirmation(
+  prompter: InteractivePrompter,
+): Promise<void> {
+  prompter.write('');
+  prompter.write(`${ANSI_ACTIVE_BLUE}================ RUN FINISHED ================${ANSI_RESET}`);
+  prompter.write('Chromium will stay open so you can manage anything else while still logged in.');
+  await prompter.ask(
+    `Press ${ANSI_ACTIVE_YELLOW}ENTER${ANSI_RESET} when you want to close Chromium and exit: `,
+  );
 }
 
 export function createConsolePrompter(
@@ -409,77 +511,38 @@ async function promptForSingleBruteChoice(
   }
 }
 
-export async function promptForRunSelection(
+export async function promptForBruteSelection(
   bruteNames: string[],
   prompter: InteractivePrompter,
+  runModeChoice: Exclude<InteractiveRunModeChoice, 'all-brutes'>,
 ): Promise<InteractiveRunSelection> {
   if (bruteNames.length === 0) {
     throw new Error('No available brutes were found for interactive selection.');
   }
 
-  if (prompter.chooseOne) {
-    const modeChoice = await prompter.chooseOne('Choose how to run this account:', [
-      'Run all brutes',
-      'Run one brute',
-      'Run selected brutes',
-    ]);
-
-    if (modeChoice === 0) {
-      return {
-        executionMode: 'all-brutes',
-        bruteNames: [...bruteNames],
-      };
-    }
-
-    if (modeChoice === 1) {
-      return {
-        executionMode: 'single',
-        bruteNames: [await promptForSingleBruteChoice(bruteNames, prompter)],
-      };
-    }
-
-    if (prompter.chooseMany) {
-      const selectedIndexes = await prompter.chooseMany('Choose brutes to run:', bruteNames);
-      return {
-        executionMode: 'single',
-        bruteNames: selectedIndexes.map((index) => bruteNames[index]),
-      };
-    }
-  }
-
-  prompter.write('Run mode:');
-  prompter.write('1. Run all brutes');
-  prompter.write('2. Run one brute');
-  prompter.write('3. Run selected brutes');
-
-  while (true) {
-    const modeChoice = parsePositiveIndex(
-      normalizeText(await prompter.ask('Choose how to run this account: ')),
-      3,
-    );
-    if (modeChoice === undefined) {
-      prompter.write('Choose 1, 2, or 3.');
-      continue;
-    }
-
-    if (modeChoice === 0) {
-      return {
-        executionMode: 'all-brutes',
-        bruteNames: [...bruteNames],
-      };
-    }
-
-    if (modeChoice === 1) {
+  if (runModeChoice === 'one-brute') {
+    if (!prompter.chooseOne) {
       prompter.write('Available brutes for single selection:');
       bruteNames.forEach((bruteName, index) => {
         prompter.write(`${index + 1}. ${bruteName}`);
       });
-      return {
-        executionMode: 'single',
-        bruteNames: [await promptForSingleBruteChoice(bruteNames, prompter)],
-      };
     }
 
+    return {
+      executionMode: 'single',
+      bruteNames: [await promptForSingleBruteChoice(bruteNames, prompter)],
+    };
+  }
+
+  if (prompter.chooseMany) {
+    const selectedIndexes = await prompter.chooseMany('Choose brutes to run:', bruteNames);
+    return {
+      executionMode: 'single',
+      bruteNames: selectedIndexes.map((index) => bruteNames[index]),
+    };
+  }
+
+  while (true) {
     prompter.write('Available brutes for multi-selection:');
     bruteNames.forEach((bruteName, index) => {
       prompter.write(`${index + 1}. ${bruteName}`);
@@ -497,4 +560,24 @@ export async function promptForRunSelection(
 
     prompter.write('Choose at least one valid brute number.');
   }
+}
+
+export async function promptForRunSelection(
+  bruteNames: string[],
+  prompter: InteractivePrompter,
+): Promise<InteractiveRunSelection> {
+  if (bruteNames.length === 0) {
+    throw new Error('No available brutes were found for interactive selection.');
+  }
+
+  const runModeChoice = await promptForRunModeChoice(prompter);
+
+  if (runModeChoice === 'all-brutes') {
+    return {
+      executionMode: 'all-brutes',
+      bruteNames: [...bruteNames],
+    };
+  }
+
+  return promptForBruteSelection(bruteNames, prompter, runModeChoice);
 }

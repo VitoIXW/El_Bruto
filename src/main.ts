@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+
 import { saveAccount, loadSavedAccounts } from './auth/accounts';
 import { parseCliArgs } from './cli';
 import { buildConfig } from './config';
@@ -5,6 +7,7 @@ import { launchPersistentSession } from './browser/session';
 import { accountRunHasFailure } from './game/roster';
 import { createLogger } from './reporting/logger';
 import { formatAccountSummary, formatSummary } from './reporting/summary';
+import { registerGracefulShutdown } from './shutdown';
 import { runAllBrutes } from './game/account-runner';
 import { runBrute, runCurrentBrute } from './game/brute-runner';
 import { listHallRosterBrutes } from './game/navigation';
@@ -12,8 +15,11 @@ import { bootstrapToAuthenticatedHome, continueToConfiguredBrute } from './game/
 import {
   createConsolePrompter,
   promptForAccountSelection,
+  promptForBruteSelection,
+  promptForInteractiveCompletionBehavior,
   promptForLevelUpBehavior,
-  promptForRunSelection,
+  promptForRunModeChoice,
+  waitForInteractiveCompletionConfirmation,
   waitForManualLevelUpConfirmation,
   writeInteractiveHeader,
 } from './ui/interactive';
@@ -57,22 +63,43 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
       targetBruteName: undefined,
       loginCredentials: accountChoice.credentials,
     };
+    const runModeChoice = await promptForRunModeChoice(prompter);
+    const levelUpBehavior = interactiveConfig.headless
+      ? 'skip_brute'
+      : await promptForLevelUpBehavior(prompter);
+    const completionBehavior = interactiveConfig.headless
+      ? 'close_program'
+      : await promptForInteractiveCompletionBehavior(prompter);
+    prompter.clearScreen?.();
 
     const { context, page } = await launchPersistentSession(interactiveConfig);
+    const unregisterShutdown = registerGracefulShutdown(async () => {
+      await prompter.close();
+      await context.close();
+      fs.rmSync(interactiveConfig.profileDir, { recursive: true, force: true });
+      logger.warn(`Removed persisted browser profile after interrupt: ${interactiveConfig.profileDir}`);
+    }, logger);
 
     try {
       await bootstrapToAuthenticatedHome(page, interactiveConfig, logger);
       logger.info('Authenticated home detected. Opening /hall to discover account brutes.');
       const bruteNames = await listHallRosterBrutes(page, interactiveConfig.bootstrapUrl, logger);
-      const selection = await promptForRunSelection(bruteNames, prompter);
-      const levelUpBehavior = interactiveConfig.headless
-        ? 'skip_brute'
-        : await promptForLevelUpBehavior(prompter);
+      const selection = runModeChoice === 'all-brutes'
+        ? {
+            executionMode: 'all-brutes' as const,
+            bruteNames: [...bruteNames],
+          }
+        : await promptForBruteSelection(
+            bruteNames,
+            prompter,
+            runModeChoice,
+          );
       prompter.clearScreen?.();
 
       const executionConfig: RunConfig = {
         ...interactiveConfig,
         interactiveLevelUpBehavior: levelUpBehavior,
+        interactiveCompletionBehavior: completionBehavior,
         onInteractiveLevelUpReady:
           !interactiveConfig.headless && levelUpBehavior === 'wait_for_manual_resume'
             ? async (bruteName: string) => waitForManualLevelUpConfirmation(bruteName, prompter)
@@ -87,21 +114,25 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
         const summary = await runAllBrutes(page, allBrutesConfig, logger, state, selection.bruteNames);
         logger.info(formatAccountSummary(summary, { color: logger.supportsColor }));
         process.exitCode = accountRunHasFailure(summary) ? 1 : 0;
-        return;
+      } else {
+        const summaries: RunSummary[] = [];
+        for (const bruteName of selection.bruteNames) {
+          const bruteConfig = buildBruteRunConfig(executionConfig, bruteName);
+          logger.info(`Continuing interactive selection directly to ${bruteConfig.targetUrl}.`);
+          const state = await continueToConfiguredBrute(page, bruteConfig, logger);
+          const summary = await runCurrentBrute(page, bruteConfig, logger, state);
+          summaries.push(summary);
+          logger.info(formatSummary(summary, { color: logger.supportsColor }));
+        }
+
+        process.exitCode = summaries.some((summary) => summary.errorsOccurred) ? 1 : 0;
       }
 
-      const summaries: RunSummary[] = [];
-      for (const bruteName of selection.bruteNames) {
-        const bruteConfig = buildBruteRunConfig(executionConfig, bruteName);
-        logger.info(`Continuing interactive selection directly to ${bruteConfig.targetUrl}.`);
-        const state = await continueToConfiguredBrute(page, bruteConfig, logger);
-        const summary = await runCurrentBrute(page, bruteConfig, logger, state);
-        summaries.push(summary);
-        logger.info(formatSummary(summary, { color: logger.supportsColor }));
+      if (completionBehavior === 'keep_browser_open') {
+        await waitForInteractiveCompletionConfirmation(prompter);
       }
-
-      process.exitCode = summaries.some((summary) => summary.errorsOccurred) ? 1 : 0;
     } finally {
+      unregisterShutdown();
       await context.close();
     }
   } finally {
@@ -121,6 +152,11 @@ async function main(): Promise<void> {
   }
 
   const { context, page } = await launchPersistentSession(config);
+  const unregisterShutdown = registerGracefulShutdown(async () => {
+    await context.close();
+    fs.rmSync(config.profileDir, { recursive: true, force: true });
+    logger.warn(`Removed persisted browser profile after interrupt: ${config.profileDir}`);
+  }, logger);
 
   try {
     if (config.executionMode === 'all-brutes') {
@@ -134,6 +170,7 @@ async function main(): Promise<void> {
     logger.info(formatSummary(summary, { color: logger.supportsColor }));
     process.exitCode = summary.errorsOccurred ? 1 : 0;
   } finally {
+    unregisterShutdown();
     await context.close();
   }
 }

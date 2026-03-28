@@ -21,6 +21,7 @@ export type FinalStatus =
 export type ExecutionMode = 'single' | 'all-brutes';
 export type RunStyle = 'automatic' | 'interactive';
 export type LevelUpBehavior = 'skip_brute' | 'wait_for_manual_resume';
+export type InteractiveCompletionBehavior = 'close_program' | 'keep_browser_open';
 
 export interface CliOptions {
   runStyle: RunStyle;
@@ -51,6 +52,7 @@ export interface RunConfig {
   stepTimeoutMs: number;
   maxActionRetries: number;
   interactiveLevelUpBehavior?: LevelUpBehavior;
+  interactiveCompletionBehavior?: InteractiveCompletionBehavior;
   onInteractiveLevelUpReady?: (bruteName: string) => Promise<void>;
   loginCredentials?: LoginCredentials;
 }

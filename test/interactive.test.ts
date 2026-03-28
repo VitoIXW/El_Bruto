@@ -4,8 +4,12 @@ import assert from 'node:assert/strict';
 import {
   parseMultiSelection,
   promptForAccountSelection,
+  promptForBruteSelection,
+  promptForInteractiveCompletionBehavior,
   promptForLevelUpBehavior,
+  promptForRunModeChoice,
   promptForRunSelection,
+  waitForInteractiveCompletionConfirmation,
   waitForManualLevelUpConfirmation,
   writeInteractiveHeader,
   type InteractivePrompter,
@@ -65,6 +69,10 @@ function createSelectablePrompter(oneChoices: number[], manyChoices: number[][] 
   };
 
   return { prompter, prompts, writes };
+}
+
+function stripAnsi(value: string): string {
+  return value.replace(/\u001B\[[0-9;]*m/g, '');
 }
 
 test('promptForAccountSelection uses a saved account when chosen', async () => {
@@ -128,6 +136,44 @@ test('promptForRunSelection supports selected multiple brutes', async () => {
     '3. Run selected brutes',
   ]);
   assert.match(writes[4] ?? '', /Available brutes for multi-selection:/);
+});
+
+test('promptForRunModeChoice supports textual selection', async () => {
+  const { prompter, writes } = createPrompter(['3']);
+
+  const result = await promptForRunModeChoice(prompter);
+
+  assert.equal(result, 'selected-brutes');
+  assert.deepEqual(writes.slice(0, 4), [
+    'Run mode:',
+    '1. Run all brutes',
+    '2. Run one brute',
+    '3. Run selected brutes',
+  ]);
+});
+
+test('promptForRunModeChoice supports arrow-style selection', async () => {
+  const { prompter } = createSelectablePrompter([1]);
+
+  const result = await promptForRunModeChoice(prompter);
+
+  assert.equal(result, 'one-brute');
+});
+
+test('promptForBruteSelection supports single textual selection after mode choice', async () => {
+  const { prompter, writes } = createPrompter(['2']);
+
+  const result = await promptForBruteSelection(
+    ['ExampleBrute', 'TargetBrute', 'OpponentBrute'],
+    prompter,
+    'one-brute',
+  );
+
+  assert.deepEqual(result, {
+    executionMode: 'single',
+    bruteNames: ['TargetBrute'],
+  });
+  assert.match(writes[0] ?? '', /Available brutes for single selection:/);
 });
 
 test('promptForRunSelection only shows brute numbering after choosing single-brute mode', async () => {
@@ -202,6 +248,21 @@ test('promptForRunSelection supports arrow-style multi brute selection', async (
   });
 });
 
+test('promptForBruteSelection supports arrow-style multi brute selection after mode choice', async () => {
+  const { prompter } = createSelectablePrompter([], [[0, 2]]);
+
+  const result = await promptForBruteSelection(
+    ['ExampleBrute', 'TargetBrute', 'OpponentBrute'],
+    prompter,
+    'selected-brutes',
+  );
+
+  assert.deepEqual(result, {
+    executionMode: 'single',
+    bruteNames: ['ExampleBrute', 'OpponentBrute'],
+  });
+});
+
 test('promptForLevelUpBehavior supports textual selection', async () => {
   const { prompter, writes } = createPrompter(['2']);
 
@@ -223,6 +284,27 @@ test('promptForLevelUpBehavior supports arrow-style selection', async () => {
   assert.equal(result, 'wait_for_manual_resume');
 });
 
+test('promptForInteractiveCompletionBehavior supports textual selection', async () => {
+  const { prompter, writes } = createPrompter(['2']);
+
+  const result = await promptForInteractiveCompletionBehavior(prompter);
+
+  assert.equal(result, 'keep_browser_open');
+  assert.deepEqual(writes.slice(0, 3), [
+    'Run completion handling:',
+    '1. Close the program and Chromium when the run finishes',
+    '2. Keep Chromium open when the run finishes',
+  ]);
+});
+
+test('promptForInteractiveCompletionBehavior supports arrow-style selection', async () => {
+  const { prompter } = createSelectablePrompter([1]);
+
+  const result = await promptForInteractiveCompletionBehavior(prompter);
+
+  assert.equal(result, 'keep_browser_open');
+});
+
 test('waitForManualLevelUpConfirmation pauses for terminal confirmation', async () => {
   const { prompter, prompts, writes } = createPrompter(['']);
 
@@ -238,6 +320,21 @@ test('waitForManualLevelUpConfirmation pauses for terminal confirmation', async 
   assert.equal(writes[5], '========================================');
   assert.equal(prompts.length, 1);
   assert.match(prompts[0] ?? '', /Press .*ENTER.* when you are done and want to continue: /);
+});
+
+test('waitForInteractiveCompletionConfirmation pauses before closing Chromium', async () => {
+  const { prompter, prompts, writes } = createPrompter(['']);
+
+  await waitForInteractiveCompletionConfirmation(prompter);
+
+  assert.deepEqual(writes.map(stripAnsi), [
+    '',
+    '================ RUN FINISHED ================',
+    'Chromium will stay open so you can manage anything else while still logged in.',
+  ]);
+  assert.deepEqual(prompts, [
+    'Press \u001B[38;5;226mENTER\u001B[0m when you want to close Chromium and exit: ',
+  ]);
 });
 
 test('parseMultiSelection keeps valid unique brute selections in input order', () => {
