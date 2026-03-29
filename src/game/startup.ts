@@ -1,6 +1,7 @@
 import type { Page } from 'playwright';
 
 import { loadLoginCredentials } from '../auth/credentials';
+import { throwIfRunCancelled } from '../core/cancellation';
 import type { Logger } from '../reporting/logger';
 import type { LoginCredentials, RunConfig, StateDetectionDetails } from '../types/run-types';
 import { detectState } from './detector';
@@ -18,9 +19,10 @@ function resolveLoginCredentials(config: RunConfig): LoginCredentials {
 }
 
 async function navigateToTargetBrute(page: Page, config: RunConfig, logger: Logger) {
+  throwIfRunCancelled(config);
   logger.info(`Opening configured brute ${config.targetUrl}`);
   await page.goto(config.targetUrl, { waitUntil: 'domcontentloaded' });
-  return waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login');
+  return waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login', config);
 }
 
 export async function continueToConfiguredBrute(
@@ -39,9 +41,13 @@ export async function waitForLoginSubmitTransition(
   page: Page,
   logger: Logger,
   timeoutMs: number,
+  runConfig?: Pick<RunConfig, 'stopSignal'>,
 ): Promise<StateDetectionDetails> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    if (runConfig) {
+      throwIfRunCancelled(runConfig);
+    }
     const state = await detectState(page, logger);
     if (isActionablePostSubmitState(state)) {
       return state;
@@ -57,9 +63,13 @@ export async function waitForStableGameState(
   logger: Logger,
   timeoutMs: number,
   phase: StableStatePhase,
+  runConfig?: Pick<RunConfig, 'stopSignal'>,
 ): Promise<StateDetectionDetails> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    if (runConfig) {
+      throwIfRunCancelled(runConfig);
+    }
     const state = await detectState(page, logger);
     if (!isTransientState(state.state, phase)) {
       return state;
@@ -84,13 +94,13 @@ export async function bootstrapToAuthenticatedHome(
       case 'public_home':
         logger.info('Public home detected. Opening the login form.');
         await clickPublicLogin(page);
-        state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'login');
+        state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'login', config);
         continue;
       case 'login_form': {
         const credentials = resolveLoginCredentials(config);
         logger.info(`Login form detected. Submitting credentials from ${credentials.source}.`);
         await submitLoginForm(page, credentials.username, credentials.password);
-        state = await waitForLoginSubmitTransition(page, logger, config.loginTimeoutMs);
+        state = await waitForLoginSubmitTransition(page, logger, config.loginTimeoutMs, config);
         continue;
       }
       case 'authenticated_home':
@@ -98,12 +108,12 @@ export async function bootstrapToAuthenticatedHome(
       case 'login_required':
       case 'unknown':
         logger.info(`Waiting for startup state to stabilize from ${state.state}.`);
-        state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'login');
+        state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'login', config);
         continue;
       default:
         logger.info(`Authenticated state ${state.state} detected before home. Re-opening the account home.`);
         await page.goto(config.bootstrapUrl, { waitUntil: 'domcontentloaded' });
-        state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'login');
+        state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'login', config);
         if (state.state !== 'authenticated_home') {
           throw new Error(`Unable to reach the authenticated home page from ${state.state}.`);
         }
@@ -128,20 +138,20 @@ export async function bootstrapIntoTargetBrute(
       case 'public_home':
         logger.info('Public home detected. Opening the login form.');
         await clickPublicLogin(page);
-        state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'login');
+        state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'login', config);
         continue;
       case 'login_form': {
         const credentials = resolveLoginCredentials(config);
         logger.info(`Login form detected. Submitting credentials from ${credentials.source}.`);
         await submitLoginForm(page, credentials.username, credentials.password);
-        state = await waitForLoginSubmitTransition(page, logger, config.loginTimeoutMs);
+        state = await waitForLoginSubmitTransition(page, logger, config.loginTimeoutMs, config);
         continue;
       }
       case 'authenticated_home':
         if (config.executionMode === 'all-brutes') {
           logger.info('Authenticated home detected. Opening the first brute from the roster.');
           await clickFirstHomeBrute(page);
-          return waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login');
+          return waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login', config);
         }
 
         if (!targetBruteName) {
@@ -152,7 +162,7 @@ export async function bootstrapIntoTargetBrute(
       case 'login_required':
       case 'unknown':
         logger.info(`Waiting for startup state to stabilize from ${state.state}.`);
-        state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'login');
+        state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'login', config);
         continue;
       default:
         if (config.executionMode === 'single' && targetBruteName && !isTargetBruteLoaded(targetBruteName, state)) {

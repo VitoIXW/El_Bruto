@@ -2,12 +2,16 @@
   "name": "el-bruto",
   "version": "0.2.2",
   "private": true,
-  "description": "Phase A CLI automation for EternalTwin La Brute arena fights.",
+  "description": "CLI and desktop automation for EternalTwin La Brute arena fights.",
   "type": "commonjs",
+  "main": "dist/src/desktop/main/electron-main.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/build-renderer.mjs",
     "start": "node dist/src/main.js",
     "dev": "tsx src/main.ts",
+    "desktop:start": "npm run build && electron .",
+    "desktop:dev": "npm run build && electron .",
+    "desktop:pack": "npm run build && electron-builder --win nsis",
     "test": "node --test dist/test/**/*.test.js",
     "check": "npm run build && npm run test"
   },
@@ -15,11 +19,33 @@
     "node": ">=20"
   },
   "dependencies": {
-    "playwright": "^1.54.2"
+    "playwright": "^1.54.2",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "electron": "^37.6.0",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.25.10",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
+  },
+  "build": {
+    "appId": "org.eternaltwin.elbrutocontrol",
+    "productName": "El Bruto Control",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    }
   }
 }

@@ -1,5 +1,7 @@
 import type { Page } from 'playwright';
 
+import { isRunCancelled, throwIfRunCancelled } from '../core/cancellation';
+import { emitRunEvent } from '../core/events';
 import type { Logger } from '../reporting/logger';
 import type {
   AccountRunSummary,
@@ -32,11 +34,12 @@ async function moveToCurrentBruteCell(page: Page, config: RunConfig, logger: Log
   const cellUrl = buildBruteCellUrl(config.targetUrl, bruteName);
   logger.info(`Recovering brute cell before moving on: ${cellUrl}`);
   await page.goto(cellUrl, { waitUntil: 'domcontentloaded' });
-  return waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login');
+  return waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login', config);
 }
 
 async function waitForDifferentBruteIdentity(
   page: Page,
+  config: RunConfig,
   logger: Logger,
   currentBruteName: string,
   timeoutMs: number,
@@ -44,6 +47,7 @@ async function waitForDifferentBruteIdentity(
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
+    throwIfRunCancelled(config);
     const observedState = await detectState(page, logger);
     if (isConfirmedDifferentBrute(currentBruteName, observedState)) {
       return observedState;
@@ -56,6 +60,7 @@ async function waitForDifferentBruteIdentity(
 
 async function settleConfirmedBruteState(
   page: Page,
+  config: RunConfig,
   logger: Logger,
   currentBruteName: string,
   firstObservedState: Awaited<ReturnType<typeof detectState>>,
@@ -69,6 +74,7 @@ async function settleConfirmedBruteState(
   );
 
   while (Date.now() < standardSettleDeadline) {
+    throwIfRunCancelled(config);
     await page.waitForTimeout(NEXT_BRUTE_SETTLE_DELAY_MS);
     const recheckedState = await detectState(page, logger);
     settledState = selectPreferredSettledNextBruteState(
@@ -86,6 +92,7 @@ async function settleConfirmedBruteState(
     shouldDelayConfirmedBruteRestingAcceptance(settledState) &&
     Date.now() < restingAcceptanceDeadline
   ) {
+    throwIfRunCancelled(config);
     await page.waitForTimeout(NEXT_BRUTE_SETTLE_DELAY_MS);
     const recheckedState = await detectState(page, logger);
     settledState = selectPreferredSettledNextBruteState(
@@ -109,6 +116,7 @@ async function moveToNextBrute(
   currentBruteName: string,
   bruteOrder?: string[],
 ) {
+  throwIfRunCancelled(config);
   if (bruteOrder) {
     const currentIndex = bruteOrder.indexOf(currentBruteName);
     if (currentIndex >= 0 && currentIndex + 1 < bruteOrder.length) {
@@ -116,7 +124,7 @@ async function moveToNextBrute(
       const nextCellUrl = buildBruteCellUrl(config.targetUrl, nextBruteName);
       logger.info(`Continuing directly to the next selected brute cell: ${nextCellUrl}`);
       await page.goto(nextCellUrl, { waitUntil: 'domcontentloaded' });
-      const nextState = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login');
+      const nextState = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login', config);
       if (nextState.bruteNameFromPage !== nextBruteName) {
         throw new Error(`Unable to stabilize on the next selected brute ${nextBruteName}.`);
       }
@@ -139,10 +147,11 @@ async function moveToNextBrute(
 
   logger.info(`Advancing from brute ${currentBruteName} to the next brute in the roster.`);
   await clickNextBrute(page);
-  const firstObservedState = await waitForDifferentBruteIdentity(page, logger, currentBruteName, config.stepTimeoutMs);
+  const firstObservedState = await waitForDifferentBruteIdentity(page, config, logger, currentBruteName, config.stepTimeoutMs);
 
   return settleConfirmedBruteState(
     page,
+    config,
     logger,
     currentBruteName,
     firstObservedState,
@@ -203,6 +212,9 @@ export async function runAllBrutes(
   let failureReason: string | undefined;
 
   while (true) {
+    if (isRunCancelled(config)) {
+      break;
+    }
     const currentBruteName = state.bruteNameFromPage ?? bootstrapBruteName;
     if (shouldStopRosterCycle(visitedBrutes, currentBruteName)) {
       cycleCompleted = true;
@@ -232,6 +244,10 @@ export async function runAllBrutes(
       logger.error(failureReason);
       break;
     }
+  }
+
+  if (isRunCancelled(config)) {
+    emitRunEvent(config, 'run_cancel_requested', { bruteName: bootstrapBruteName });
   }
 
   return summarizeAccountRun(bootstrapBruteName, bruteResults, cycleCompleted, advanceFailed, failureReason);

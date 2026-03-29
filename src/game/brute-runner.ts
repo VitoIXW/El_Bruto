@@ -1,5 +1,7 @@
 import type { Page } from 'playwright';
 
+import { RunCancelledError, isRunCancelled, throwIfRunCancelled } from '../core/cancellation';
+import { emitBruteUpdated, emitRunEvent, emitStateChanged } from '../core/events';
 import type { Logger } from '../reporting/logger';
 import type { FailureArtifacts, PageState, RunConfig, RunSummary, StateDetectionDetails } from '../types/run-types';
 import { captureFailureArtifacts, captureFailureArtifactsSafely } from '../reporting/artifacts';
@@ -13,6 +15,7 @@ import { extractTargetBruteName } from './target-resolution';
 
 async function executeStateSafeAction(
   page: Page,
+  config: RunConfig,
   expectedSourceState: PageState,
   action: () => Promise<void>,
   retries: number,
@@ -21,6 +24,7 @@ async function executeStateSafeAction(
 ): Promise<void> {
   let attempt = 0;
   while (attempt <= retries) {
+    throwIfRunCancelled(config);
     try {
       await action();
       return;
@@ -93,39 +97,46 @@ export async function runCurrentBrute(
   try {
     let state: StateDetectionDetails = initialState;
     bruteName = state.bruteNameFromPage ?? bruteName;
+    emitRunEvent(config, 'brute_started', { bruteName });
 
     while (true) {
       logger.info(`Current state: ${state.state}`);
       bruteName = state.bruteNameFromPage ?? bruteName;
+      emitStateChanged(config, bruteName, state);
+      throwIfRunCancelled(config);
 
       switch (state.state) {
         case 'cell_resting':
           restingReached = true;
           finalStatus = 'resting';
-          return {
-            bruteName,
-            fightsCompleted,
-            wins,
-            losses,
-            finalStatus,
-            restingReached,
-            levelUpDetected,
-            errorsOccurred,
-            artifacts,
-          };
+          {
+            const summary = {
+              bruteName,
+              fightsCompleted,
+              wins,
+              losses,
+              finalStatus,
+              restingReached,
+              levelUpDetected,
+              errorsOccurred,
+              artifacts,
+            };
+            emitBruteUpdated(config, summary);
+            return summary;
+          }
         case 'cell_ready':
-          await executeStateSafeAction(page, 'cell_ready', async () => {
+          await executeStateSafeAction(page, config, 'cell_ready', async () => {
             await clickArena(page);
             await waitForUrlSuffix(page, '/arena', config.stepTimeoutMs);
           }, config.maxActionRetries, logger, 'Navigate to arena');
           break;
         case 'arena_selection':
-          await executeStateSafeAction(page, 'arena_selection', async () => {
+          await executeStateSafeAction(page, config, 'arena_selection', async () => {
             await selectOpponent(page, config.stepTimeoutMs, logger);
           }, config.maxActionRetries, logger, 'Select arena opponent');
           break;
         case 'pre_fight':
-          await executeStateSafeAction(page, 'pre_fight', async () => {
+          await executeStateSafeAction(page, config, 'pre_fight', async () => {
             await launchFightFromPreFight(page, config.stepTimeoutMs);
           }, config.maxActionRetries, logger, 'Start fight from pre-fight');
           break;
@@ -133,13 +144,13 @@ export async function runCurrentBrute(
           if (bruteName === 'unknown') {
             throw new Error('Unable to determine brute name before returning from fight.');
           }
-          await executeStateSafeAction(page, 'fight', async () => {
+          await executeStateSafeAction(page, config, 'fight', async () => {
             await clickReturnToCurrentCell(page, bruteName);
             await waitForUrlSuffix(page, '/cell', config.stepTimeoutMs);
           }, config.maxActionRetries, logger, 'Return to brute cell');
 
           await page.waitForLoadState('domcontentloaded');
-          state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login');
+          state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login', config);
           bruteName = state.bruteNameFromPage ?? bruteName;
 
           const fightOutcome = await readLatestCellFightOutcome(
@@ -156,41 +167,61 @@ export async function runCurrentBrute(
             logger.warn('Could not determine the latest fight outcome from the cell event log.');
           }
 
+          emitRunEvent(config, 'latest_fight_result_detected', {
+            bruteName,
+            outcome: fightOutcome ?? 'unknown',
+          });
+          emitRunEvent(config, 'fight_completed', {
+            bruteName,
+            fightsCompleted,
+            wins,
+            losses,
+          });
           logger.info(`Fight completed. Total fights: ${fightsCompleted}`);
           continue;
         case 'level_up':
           levelUpDetected = true;
+          emitRunEvent(config, 'level_up_detected', { bruteName });
           if (
             !config.headless &&
             config.interactiveLevelUpBehavior === 'wait_for_manual_resume' &&
             config.onInteractiveLevelUpReady
           ) {
             logger.info(`Level-up detected for ${bruteName}. Waiting for manual confirmation to continue.`);
-            await config.onInteractiveLevelUpReady(bruteName);
-            state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login');
+            emitRunEvent(config, 'manual_pause_started', { bruteName });
+            const action = await config.onInteractiveLevelUpReady(bruteName);
+            if (action === 'cancel') {
+              throw new RunCancelledError(`Run cancelled during level-up confirmation for ${bruteName}.`);
+            }
+            emitRunEvent(config, 'manual_pause_resumed', { bruteName });
+            state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login', config);
             bruteName = state.bruteNameFromPage ?? bruteName;
             continue;
           }
 
           finalStatus = 'manual_intervention_required';
-          return {
-            bruteName,
-            fightsCompleted,
-            wins,
-            losses,
-            finalStatus,
-            restingReached,
-            levelUpDetected,
-            errorsOccurred,
-            artifacts,
-          };
+          {
+            const summary = {
+              bruteName,
+              fightsCompleted,
+              wins,
+              losses,
+              finalStatus,
+              restingReached,
+              levelUpDetected,
+              errorsOccurred,
+              artifacts,
+            };
+            emitBruteUpdated(config, summary);
+            return summary;
+          }
         case 'public_home':
         case 'login_form':
         case 'authenticated_home':
         case 'login_required':
         case 'unknown':
           logger.warn(`Transient state ${state.state} detected at ${page.url()}. Waiting for stabilization.`);
-          state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login');
+          state = await waitForStableGameState(page, logger, config.stepTimeoutMs, 'post_login', config);
           bruteName = state.bruteNameFromPage ?? bruteName;
           continue;
         default:
@@ -201,6 +232,23 @@ export async function runCurrentBrute(
       state = await detectState(page, logger);
     }
   } catch (error) {
+    if (error instanceof RunCancelledError || isRunCancelled(config)) {
+      finalStatus = 'cancelled';
+      const summary = {
+        bruteName,
+        fightsCompleted,
+        wins,
+        losses,
+        finalStatus,
+        restingReached,
+        levelUpDetected,
+        errorsOccurred: false,
+        artifacts,
+      };
+      emitBruteUpdated(config, summary);
+      return summary;
+    }
+
     errorsOccurred = true;
 
     if ((error as Error).message.includes('Stable game state timeout [phase=login]')) {
@@ -225,7 +273,7 @@ export async function runCurrentBrute(
       artifacts,
     }, { color: logger.supportsColor }));
 
-    return {
+    const summary = {
       bruteName,
       fightsCompleted,
       wins,
@@ -236,5 +284,12 @@ export async function runCurrentBrute(
       errorsOccurred,
       artifacts,
     };
+    emitBruteUpdated(config, summary);
+    emitRunEvent(config, 'error', {
+      bruteName,
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
+    return summary;
   }
 }

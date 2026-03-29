@@ -12,6 +12,7 @@ export interface BrowserSession {
 export async function launchPersistentSession(config: RunConfig): Promise<BrowserSession> {
   fs.mkdirSync(config.profileDir, { recursive: true });
   const context = await chromium.launchPersistentContext(config.profileDir, {
+    executablePath: config.browserExecutablePath,
     headless: config.headless,
   });
 
