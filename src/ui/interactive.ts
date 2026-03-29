@@ -203,9 +203,14 @@ export async function waitForManualLevelUpConfirmation(
   bruteName: string,
   prompter: InteractivePrompter,
 ): Promise<void> {
-  prompter.write(`The brute ${bruteName} leveled up.`);
+  prompter.write('');
+  prompter.write('========================================');
+  prompter.write(`${ANSI_ACTIVE_YELLOW}LEVEL UP${ANSI_RESET} required for ${bruteName}`);
   prompter.write('Chromium will stay open so you can choose the level-up manually.');
-  await prompter.ask('Press Enter when you are done and want to continue: ');
+  prompter.write(`Press ${ANSI_ACTIVE_YELLOW}ENTER${ANSI_RESET} when you are done and want to continue.`);
+  prompter.write('========================================');
+  prompter.write('');
+  await prompter.ask(`Press ${ANSI_ACTIVE_YELLOW}ENTER${ANSI_RESET} when you are done and want to continue: `);
 }
 
 export async function waitForInteractiveCompletionConfirmation(
