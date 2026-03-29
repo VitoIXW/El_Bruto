@@ -11,6 +11,7 @@ test('parseCliArgs uses defaults', () => {
   assert.equal(options.mode, 'single');
   assert.equal(options.debug, false);
   assert.equal(options.headless, false);
+  assert.equal(options.preClickDelay, true);
 });
 
 test('parseCliArgs reads supported flags', () => {
@@ -35,6 +36,13 @@ test('parseCliArgs reads supported flags', () => {
   assert.equal(options.debug, true);
   assert.equal(options.headless, true);
   assert.equal(options.loginTimeoutMs, 5000);
+  assert.equal(options.preClickDelay, true);
+});
+
+test('parseCliArgs can disable the randomized pre-click delay', () => {
+  const options = parseCliArgs(['--no-pre-click-delay']);
+
+  assert.equal(options.preClickDelay, false);
 });
 
 test('parseCliArgs enables interactive mode explicitly', () => {

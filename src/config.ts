@@ -48,6 +48,7 @@ export function buildConfig(options: CliOptions): RunConfig {
     logsDir: path.resolve(options.logsDir ?? 'logs'),
     headless: options.headless,
     debug: options.debug,
+    preClickDelay: options.preClickDelay,
     loginTimeoutMs: options.loginTimeoutMs ?? DEFAULT_LOGIN_TIMEOUT_MS,
     stepTimeoutMs: DEFAULT_STEP_TIMEOUT_MS,
     maxActionRetries: DEFAULT_MAX_ACTION_RETRIES,

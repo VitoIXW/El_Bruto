@@ -310,7 +310,7 @@ test('waitForManualLevelUpConfirmation pauses for terminal confirmation', async 
 
   await waitForManualLevelUpConfirmation('ExampleBrute', prompter);
 
-  assert.equal(writes.length, 6);
+  assert.equal(writes.length, 7);
   assert.equal(writes[0], '');
   assert.match(writes[1] ?? '', /^=+/);
   assert.match(writes[2] ?? '', /LEVEL UP/);
@@ -318,6 +318,7 @@ test('waitForManualLevelUpConfirmation pauses for terminal confirmation', async 
   assert.match(writes[3] ?? '', /Chromium will stay open/);
   assert.match(writes[4] ?? '', /ENTER/);
   assert.equal(writes[5], '========================================');
+  assert.equal(writes[6], '');
   assert.equal(prompts.length, 1);
   assert.match(prompts[0] ?? '', /Press .*ENTER.* when you are done and want to continue: /);
 });

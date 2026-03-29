@@ -31,6 +31,7 @@ export interface CliOptions {
   account?: string;
   debug: boolean;
   headless: boolean;
+  preClickDelay: boolean;
   profileDir?: string;
   artifactsDir?: string;
   logsDir?: string;
@@ -48,6 +49,7 @@ export interface RunConfig {
   logsDir: string;
   headless: boolean;
   debug: boolean;
+  preClickDelay: boolean;
   loginTimeoutMs: number;
   stepTimeoutMs: number;
   maxActionRetries: number;
