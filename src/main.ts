@@ -10,7 +10,7 @@ import { formatAccountSummary, formatSummary } from './reporting/summary';
 import { registerGracefulShutdown } from './shutdown';
 import { runAllBrutes } from './game/account-runner';
 import { runBrute, runCurrentBrute } from './game/brute-runner';
-import { listHallRosterBrutes } from './game/navigation';
+import { listHallRosterBrutes, setPreClickDelayEnabled } from './game/navigation';
 import { bootstrapToAuthenticatedHome, continueToConfiguredBrute } from './game/startup';
 import {
   createConsolePrompter,
@@ -143,6 +143,7 @@ async function runInteractiveMode(baseConfig: RunConfig, logger: ReturnType<type
 async function main(): Promise<void> {
   const options = parseCliArgs(process.argv.slice(2));
   const config = buildConfig(options);
+  setPreClickDelayEnabled(config.preClickDelay);
   const logger = createLogger(config.logsDir, config.debug);
   logger.info(`Launching persistent browser in ${config.executionMode} mode for ${config.targetUrl}`);
 

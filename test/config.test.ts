@@ -14,6 +14,7 @@ test('buildConfig preserves execution mode', () => {
     mode: 'all-brutes',
     debug: false,
     headless: false,
+    preClickDelay: true,
   });
 
   assert.equal(config.executionMode, 'all-brutes');
@@ -28,6 +29,7 @@ test('buildConfig requires an explicit brute for automatic single mode', () => {
       mode: 'single',
       debug: false,
       headless: false,
+      preClickDelay: true,
     }),
     /requires --brute/,
   );
@@ -42,10 +44,12 @@ test('buildConfig uses the selected brute and headless setting for automatic sin
     brute: 'TargetBrute',
     debug: false,
     headless: true,
+    preClickDelay: false,
   });
 
   assert.equal(config.accountLabel, 'Example Account');
   assert.equal(config.targetBruteName, 'TargetBrute');
   assert.equal(config.targetUrl, 'https://brute.eternaltwin.org/TargetBrute/cell');
   assert.equal(config.headless, true);
+  assert.equal(config.preClickDelay, false);
 });

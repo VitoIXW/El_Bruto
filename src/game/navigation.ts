@@ -61,6 +61,8 @@ const HALL_ENTRY_BLACKLIST = new Set([
 const HALL_NAME_MIN_LENGTH = 3;
 const HALL_REJECTION_SAMPLE_LIMIT = 3;
 const HALL_REPEATED_ENTRY_THRESHOLD = 2;
+const MAX_PRE_CLICK_DELAY_MS = 1200;
+let preClickDelayEnabled = true;
 
 interface HallCandidateInspection {
   accepted: boolean;
@@ -185,6 +187,24 @@ export function extractBruteNameFromUrl(url: string): string | undefined {
   return match?.[1];
 }
 
+export async function waitRandomPreClickDelay(
+  page: Pick<Page, 'waitForTimeout'>,
+  maxDelayMs = MAX_PRE_CLICK_DELAY_MS,
+): Promise<number> {
+  if (!preClickDelayEnabled) {
+    return 0;
+  }
+
+  const boundedDelayMs = Math.max(0, maxDelayMs);
+  const delayMs = Math.random() * boundedDelayMs;
+  await page.waitForTimeout(delayMs);
+  return delayMs;
+}
+
+export function setPreClickDelayEnabled(enabled: boolean): void {
+  preClickDelayEnabled = enabled;
+}
+
 export async function extractBruteName(page: Page): Promise<string | undefined> {
   const bruteNameFromUrl = extractBruteNameFromUrl(page.url());
   if (page.url().endsWith('/cell') && bruteNameFromUrl) {
@@ -203,6 +223,7 @@ export async function extractBruteName(page: Page): Promise<string | undefined> 
 }
 
 export async function clickArena(page: Page): Promise<void> {
+  await waitRandomPreClickDelay(page);
   await page.locator(selectors.cell.arenaLink).first().click();
 }
 
@@ -252,6 +273,7 @@ export async function readLatestCellFightOutcome(
 }
 
 export async function clickPublicLogin(page: Page): Promise<void> {
+  await waitRandomPreClickDelay(page);
   await page.locator(selectors.login.loginButton).first().click();
 }
 
@@ -265,6 +287,7 @@ export async function submitLoginForm(page: Page, username: string, password: st
   const deadline = Date.now() + LOGIN_SUBMIT_READY_TIMEOUT_MS;
   while (Date.now() < deadline) {
     if (await submitControl.isEnabled()) {
+      await waitRandomPreClickDelay(page);
       await submitControl.click();
       return;
     }
@@ -284,6 +307,7 @@ export async function clickFirstHomeBrute(page: Page): Promise<void> {
     throw new Error('No visible brute roster links were found on the authenticated home page.');
   }
 
+  await waitRandomPreClickDelay(page);
   await bruteLinks.nth(selectedCandidate.index).click();
 }
 
@@ -746,10 +770,12 @@ export async function clickHomeBrute(page: Page, bruteName: string): Promise<voi
     );
   }
 
+  await waitRandomPreClickDelay(page);
   await bruteLinks.nth(matchingCandidate.index).click();
 }
 
 export async function clickNextBrute(page: Page): Promise<void> {
+  await waitRandomPreClickDelay(page);
   await page.locator(selectors.cell.nextBruteControl).first().click();
 }
 
@@ -847,6 +873,7 @@ export async function chooseNamedOpponent(page: Page, opponentName: string): Pro
     return false;
   }
 
+  await waitRandomPreClickDelay(page);
   await match.control.click();
   return true;
 }
@@ -854,6 +881,7 @@ export async function chooseNamedOpponent(page: Page, opponentName: string): Pro
 export async function chooseFirstOpponent(page: Page): Promise<void> {
   const opponents = await readVisibleArenaOpponents(page);
   if (opponents.length > 0) {
+    await waitRandomPreClickDelay(page);
     await opponents[0].control.click();
     return;
   }
@@ -863,6 +891,7 @@ export async function chooseFirstOpponent(page: Page): Promise<void> {
 
 export async function startFight(page: Page): Promise<void> {
   const startControl = page.locator(selectors.preFight.startFightLink).first();
+  await waitRandomPreClickDelay(page);
   await startControl.click();
 }
 
@@ -875,6 +904,7 @@ export async function clickReturnToCurrentCell(page: Page, bruteName: string): P
     const link = links.nth(index);
     const href = await link.getAttribute('href');
     if (href?.includes(hrefPattern)) {
+      await waitRandomPreClickDelay(page);
       await link.click();
       return;
     }

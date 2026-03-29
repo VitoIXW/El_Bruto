@@ -310,13 +310,17 @@ test('waitForManualLevelUpConfirmation pauses for terminal confirmation', async 
 
   await waitForManualLevelUpConfirmation('ExampleBrute', prompter);
 
-  assert.deepEqual(writes, [
-    'The brute ExampleBrute leveled up.',
-    'Chromium will stay open so you can choose the level-up manually.',
-  ]);
-  assert.deepEqual(prompts, [
-    'Press Enter when you are done and want to continue: ',
-  ]);
+  assert.equal(writes.length, 7);
+  assert.equal(writes[0], '');
+  assert.match(writes[1] ?? '', /^=+/);
+  assert.match(writes[2] ?? '', /LEVEL UP/);
+  assert.match(writes[2] ?? '', /ExampleBrute/);
+  assert.match(writes[3] ?? '', /Chromium will stay open/);
+  assert.match(writes[4] ?? '', /ENTER/);
+  assert.equal(writes[5], '========================================');
+  assert.equal(writes[6], '');
+  assert.equal(prompts.length, 1);
+  assert.match(prompts[0] ?? '', /Press .*ENTER.* when you are done and want to continue: /);
 });
 
 test('waitForInteractiveCompletionConfirmation pauses before closing Chromium', async () => {

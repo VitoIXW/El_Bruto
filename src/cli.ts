@@ -6,6 +6,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
     mode: 'single',
     debug: false,
     headless: false,
+    preClickDelay: true,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -43,6 +44,9 @@ export function parseCliArgs(argv: string[]): CliOptions {
         break;
       case '--headless':
         options.headless = true;
+        break;
+      case '--no-pre-click-delay':
+        options.preClickDelay = false;
         break;
       case '--mode':
         if (!next) {

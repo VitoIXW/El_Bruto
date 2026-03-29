@@ -37,6 +37,7 @@ function createConfig(): RunConfig {
     logsDir: '/tmp/logs',
     headless: false,
     debug: false,
+    preClickDelay: true,
     loginTimeoutMs: 5000,
     stepTimeoutMs: 5000,
     maxActionRetries: 0,

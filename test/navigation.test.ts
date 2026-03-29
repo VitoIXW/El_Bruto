@@ -8,9 +8,12 @@ import {
   extractHallBruteName,
   extractHomeBruteNameFromHref,
   extractLatestCellFightOutcomeFromImageSources,
+  clickArena,
   listHallRosterBrutes,
   pickTopLeftHomeBruteEntry,
+  setPreClickDelayEnabled,
   submitLoginForm,
+  waitRandomPreClickDelay,
 } from '../src/game/navigation';
 
 test('extractBruteNameFromUrl resolves brute identity from a special cell route', () => {
@@ -102,6 +105,76 @@ test('extractLatestCellFightOutcomeFromImageSources reads the newest fight resul
     ]),
     undefined,
   );
+});
+
+test('waitRandomPreClickDelay waits between 0 and the configured maximum', async () => {
+  const capturedTimeouts: number[] = [];
+  const originalRandom = Math.random;
+  Math.random = () => 0.5;
+  setPreClickDelayEnabled(true);
+
+  try {
+    const delayMs = await waitRandomPreClickDelay({
+      async waitForTimeout(timeoutMs: number) {
+        capturedTimeouts.push(timeoutMs);
+      },
+    }, 1200);
+
+    assert.equal(delayMs, 600);
+    assert.deepEqual(capturedTimeouts, [600]);
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test('waitRandomPreClickDelay can be disabled globally', async () => {
+  const capturedTimeouts: number[] = [];
+  setPreClickDelayEnabled(false);
+
+  try {
+    const delayMs = await waitRandomPreClickDelay({
+      async waitForTimeout(timeoutMs: number) {
+        capturedTimeouts.push(timeoutMs);
+      },
+    }, 1200);
+
+    assert.equal(delayMs, 0);
+    assert.deepEqual(capturedTimeouts, []);
+  } finally {
+    setPreClickDelayEnabled(true);
+  }
+});
+
+test('clickArena waits for a randomized delay before clicking', async () => {
+  const operations: string[] = [];
+  const originalRandom = Math.random;
+  Math.random = () => 0.25;
+  setPreClickDelayEnabled(true);
+
+  const page = {
+    async waitForTimeout(timeoutMs: number) {
+      operations.push(`wait:${timeoutMs}`);
+    },
+    locator(selector: string) {
+      assert.equal(selector, selectors.cell.arenaLink);
+      return {
+        first() {
+          return {
+            async click() {
+              operations.push('click');
+            },
+          };
+        },
+      };
+    },
+  };
+
+  try {
+    await clickArena(page as never);
+    assert.deepEqual(operations, ['wait:300', 'click']);
+  } finally {
+    Math.random = originalRandom;
+  }
 });
 
 test('listHallRosterBrutes navigates to /hall and waits for hall roster content', async () => {
@@ -1452,6 +1525,8 @@ test('extractArenaOpponentName skips generic arena labels and keeps the visible 
 
 test('submitLoginForm waits for the submit control to become enabled before clicking', async () => {
   const operations: string[] = [];
+  const originalRandom = Math.random;
+  Math.random = () => 0.25;
   const submitControl = {
     first() {
       return this;
@@ -1506,15 +1581,20 @@ test('submitLoginForm waits for the submit control to become enabled before clic
     },
   };
 
-  await submitLoginForm(page as never, 'EXAMPLE_USERNAME', 'EXAMPLE_PASSWORD');
+  try {
+    await submitLoginForm(page as never, 'EXAMPLE_USERNAME', 'EXAMPLE_PASSWORD');
 
-  assert.deepEqual(operations, [
-    'username.fill:EXAMPLE_USERNAME',
-    'password.fill:EXAMPLE_PASSWORD',
-    'submit.waitFor:visible:3000',
-    'submit.isEnabled',
-    'page.waitForTimeout:100',
-    'submit.isEnabled',
-    'submit.click',
-  ]);
+    assert.deepEqual(operations, [
+      'username.fill:EXAMPLE_USERNAME',
+      'password.fill:EXAMPLE_PASSWORD',
+      'submit.waitFor:visible:3000',
+      'submit.isEnabled',
+      'page.waitForTimeout:100',
+      'submit.isEnabled',
+      'page.waitForTimeout:300',
+      'submit.click',
+    ]);
+  } finally {
+    Math.random = originalRandom;
+  }
 });
